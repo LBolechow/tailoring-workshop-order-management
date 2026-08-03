@@ -53,6 +53,11 @@ public class ApplicationException {
             super(message);
         }
     }
+    public static class PriceNotFoundException extends RuntimeException {
+        public PriceNotFoundException(String message) {
+            super(message);
+        }
+    }
 
 
 }

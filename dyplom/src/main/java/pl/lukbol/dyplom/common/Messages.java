@@ -41,6 +41,8 @@ public class Messages {
     public static final String PRICE_DELETE_MESSAGE = "A new entry has been deleted!";
     public static final String UPDATE_PRICE_MESSAGE = "Price entry has been updated!";
 
+    public static final String PRICE_NOT_FOUND = "Price not found";
+
     // Material messages
     public static final String MATERIAL_NOT_FOUND = "Material not found";
     public static final String MATERIAL_UPDATED = "Material updated successfully";

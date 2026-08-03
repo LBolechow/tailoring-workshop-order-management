@@ -13,77 +13,77 @@ import pl.lukbol.dyplom.DTOs.exception.ErrorMessageDTO;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private final static String error_msg = "Error message: ";
+    private static final String ERROR_MSG = "Error message: ";
 
     @ExceptionHandler({UsernameNotFoundException.class, BadCredentialsException.class, DisabledException.class})
     public ResponseEntity<ErrorMessageDTO> handleAuthExceptions(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new ErrorMessageDTO(error_msg, ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ErrorMessageDTO> handleDatabaseException(DataAccessException ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorMessageDTO(error_msg, "Database error: " + ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, "Database error: " + ex.getMessage()));
     }
 
     @ExceptionHandler(ApplicationException.UserWithEmailAlreadyExistsException.class)
     public ResponseEntity<ErrorMessageDTO> handleUserAlreadyExists(ApplicationException.UserWithEmailAlreadyExistsException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorMessageDTO(error_msg, ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
 
     @ExceptionHandler(ApplicationException.PasswordsMismatchException.class)
     public ResponseEntity<ErrorMessageDTO> handlePasswordsMismatch(ApplicationException.PasswordsMismatchException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorMessageDTO(error_msg, ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
 
     @ExceptionHandler(ApplicationException.UserNotFoundException.class)
     public ResponseEntity<ErrorMessageDTO> handleUserNotFound(ApplicationException.UserNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorMessageDTO(error_msg, ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
 
     @ExceptionHandler(ApplicationException.ParticipantsListIsEmptyException.class)
     public ResponseEntity<ErrorMessageDTO> handleParticipantsEmpty(ApplicationException.ParticipantsListIsEmptyException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorMessageDTO(error_msg, ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorMessageDTO> ConversationNotFoundException(Exception ex) {
+    @ExceptionHandler(ApplicationException.ConversationNotFoundException.class)
+    public ResponseEntity<ErrorMessageDTO> handleConversationNotFound(ApplicationException.ConversationNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorMessageDTO(error_msg, "Conversation error: " + ex.getMessage()));
-    }
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorMessageDTO> LastMessageNotFoundException(Exception ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorMessageDTO(error_msg, "Message error: " + ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorMessageDTO> InvalidDateException(Exception ex) {
+    @ExceptionHandler(ApplicationException.LastMessageNotFoundException.class)
+    public ResponseEntity<ErrorMessageDTO> handleLastMessageNotFound(ApplicationException.LastMessageNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorMessageDTO(error_msg, "Invalid date error: " + ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorMessageDTO> OrderNotFoundException(Exception ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorMessageDTO(error_msg, "Order error: " + ex.getMessage()));
+    @ExceptionHandler(ApplicationException.InvalidDateException.class)
+    public ResponseEntity<ErrorMessageDTO> handleInvalidDate(ApplicationException.InvalidDateException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorMessageDTO> MaterialNotFoundException(Exception ex) {
+
+    @ExceptionHandler(ApplicationException.OrderNotFoundException.class)
+    public ResponseEntity<ErrorMessageDTO> handleOrderNotFound(ApplicationException.OrderNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorMessageDTO(error_msg, "Material error: " + ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
+    }
+
+    @ExceptionHandler(ApplicationException.MaterialNotFoundException.class)
+    public ResponseEntity<ErrorMessageDTO> handleMaterialNotFound(ApplicationException.MaterialNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorMessageDTO> handleAllOtherExceptions(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorMessageDTO(error_msg, "Unexpected error: " + ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, "Unexpected error: " + ex.getMessage()));
     }
-
-
 }
