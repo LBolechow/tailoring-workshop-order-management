@@ -29,8 +29,8 @@ public class UserUtils {
 
     public void sendResetEmail(String to, String newPassword) {
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setSubject("Your new password!");
-        message.setText("Twoje nowe hasło to: " + newPassword);
+        message.setSubject(Messages.RESET_PASSWORD_EMAIL_SUBJECT);
+        message.setText(Messages.RESET_PASSWORD_EMAIL_BODY + newPassword);
         message.setTo(to);
         mailSender.send(message);
     }

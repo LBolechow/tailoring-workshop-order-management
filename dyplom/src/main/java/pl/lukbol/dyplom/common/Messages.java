@@ -47,5 +47,27 @@ public class Messages {
     public static final String MATERIAL_NOT_FOUND = "Material not found";
     public static final String MATERIAL_UPDATED = "Material updated successfully";
 
+    // Login
+
+    public static final String LOGIN_SUCCESS = "Login successful";
+
+    public static final String INVALID_CREDENTIALS = "Invalid email or password";
+
+    public static final String LOGIN_FAILED = "Login failed";
+
+    //E-mail
+
+    public static final String RESET_PASSWORD_EMAIL_SUBJECT = "Your new password!";
+
+    public static final String RESET_PASSWORD_EMAIL_BODY = "Your new password is: ";
+
+    //Conversation
+
+    public static final String CONVERSATION_CREATED = "Conversation created successfully.";
+    public static final String CONVERSATION_CREATE_ERROR = "Error creating conversation: ";
+    public static final String CONVERSATION_MARKED_AS_READ = "Messages marked as read.";
+    public static final String CONVERSATION_SEEN_CLEARED = "Read list cleared.";
+    public static final String CONVERSATION_RESTORED = "Conversation restored.";
+    public static final String CONVERSATION_HIDDEN = "Conversation hidden.";
 }
 

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import pl.lukbol.dyplom.common.Messages;
 import pl.lukbol.dyplom.configs.CustomUserDetailsService;
 import pl.lukbol.dyplom.utilities.JwtUtil;
 
@@ -38,14 +39,14 @@ public class LoginController {
             UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.email());
             String token = jwtUtil.generateToken(userDetails.getUsername());
 
-            return ResponseEntity.ok(new AuthResponse(token, "Login successful"));
+            return ResponseEntity.ok(new AuthResponse(token, Messages.LOGIN_SUCCESS));
 
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse("Invalid email or password"));
+                    .body(new ErrorResponse(Messages.INVALID_CREDENTIALS ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ErrorResponse("Login failed"));
+                    .body(new ErrorResponse(Messages.LOGIN_FAILED));
         }
     }
     public record LoginRequest(String email, String password) {}

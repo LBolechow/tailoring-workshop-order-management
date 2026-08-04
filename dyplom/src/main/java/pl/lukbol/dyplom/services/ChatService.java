@@ -131,12 +131,12 @@ public class ChatService {
             conversationRepository.save(newConversation);
 
             return ResponseEntity.ok(
-                    new ConversationResponse(true, "Konwersacja utworzona pomyślnie.")
+                    new ConversationResponse(true, Messages.CONVERSATION_CREATED)
             );
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ConversationResponse(false,
-                            "Błąd podczas tworzenia konwersacji: " + e.getMessage()));
+                            Messages.CONVERSATION_CREATE_ERROR + e.getMessage()));
         }
     }
 
@@ -152,7 +152,7 @@ public class ChatService {
             conversation.setSeenByUserIds(users);
             conversationRepository.save(conversation);
 
-            return ResponseEntity.ok("Wiadomości zostały oznaczone jako przeczytane.");
+            return ResponseEntity.ok(Messages.CONVERSATION_MARKED_AS_READ);
         } else {
             return ResponseEntity.notFound().build();
         }
@@ -167,7 +167,7 @@ public class ChatService {
             conversation.getSeenByUserIds().clear();
             conversationRepository.save(conversation);
 
-            return ResponseEntity.ok("Lista przeczytanych została wyczyszczona.");
+            return ResponseEntity.ok(Messages.CONVERSATION_SEEN_CLEARED);
         } else {
             return ResponseEntity.notFound().build();
         }
@@ -242,9 +242,9 @@ public class ChatService {
             conversationRepository.save(conversation);
 
             if (currentlyRead) {
-                return ResponseEntity.ok("Przywrócono konwersację.");
+                return ResponseEntity.ok(Messages.CONVERSATION_RESTORED);
             } else {
-                return ResponseEntity.ok("Ukryto konwersację.");
+                return ResponseEntity.ok(Messages.CONVERSATION_HIDDEN);
             }
         } else {
             return ResponseEntity.notFound().build();
