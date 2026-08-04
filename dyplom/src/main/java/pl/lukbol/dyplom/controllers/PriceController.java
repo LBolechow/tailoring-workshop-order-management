@@ -11,7 +11,7 @@ import pl.lukbol.dyplom.services.PriceService;
 
 import java.util.List;
 
-@Controller
+@RestController
 @RequiredArgsConstructor
 public class PriceController {
 
@@ -25,8 +25,8 @@ public class PriceController {
 
     @PostMapping("/add-price")
     public ResponseEntity<ApiResponseDTO> addPrice(@RequestBody PriceRequestDTO priceRequestDTO) {
-        ApiResponseDTO respone = priceService.addPrice(priceRequestDTO);
-        return ResponseEntity.ok(respone);
+        ApiResponseDTO response = priceService.addPrice(priceRequestDTO);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/delete-price/{id}")

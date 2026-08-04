@@ -81,6 +81,11 @@ public class GlobalExceptionHandler {
                 .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
 
+    @ExceptionHandler(ApplicationException.PriceNotFoundException.class)
+    public ResponseEntity<ErrorMessageDTO> handlePriceNotFound(ApplicationException.PriceNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
+    }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorMessageDTO> handleAllOtherExceptions(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

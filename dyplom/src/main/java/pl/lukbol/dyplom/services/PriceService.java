@@ -10,9 +10,6 @@ import pl.lukbol.dyplom.exceptions.ApplicationException;
 import pl.lukbol.dyplom.repositories.PriceRepository;
 
 import java.util.List;
-import java.util.Optional;
-
-import static pl.lukbol.dyplom.common.Messages.USER_NOT_FOUND_BY_ID;
 
 @Service
 public class PriceService {

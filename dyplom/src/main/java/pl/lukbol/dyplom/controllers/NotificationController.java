@@ -19,9 +19,6 @@ import static pl.lukbol.dyplom.utilities.AuthenticationUtils.checkmail;
 public class NotificationController {
 
 
-
-    private final UserRepository userRepository;
-    private final NotificationRepository notificationRepository;
     private final NotificationService notificationService;
 
     @DeleteMapping(value = "/removeAlerts", consumes = {"*/*"})

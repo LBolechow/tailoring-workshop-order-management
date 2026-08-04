@@ -44,7 +44,7 @@ public class NotificationService {
         List<User> participants = userRepository.findByIdIn(notificationRequestDTO.participantIds());
 
         if (participants.isEmpty()) {
-            throw new ApplicationException.ParticipantsListIsEmptyException(Messages.PRATICIPANTS_LIST_IS_EMPTY);
+            throw new ApplicationException.ParticipantsListIsEmptyException(Messages.PARTICIPANTS_LIST_IS_EMPTY);
         }
 
         Date currentDate = new Date();

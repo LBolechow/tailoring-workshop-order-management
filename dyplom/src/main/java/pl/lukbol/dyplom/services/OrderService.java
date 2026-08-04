@@ -131,7 +131,6 @@ public class OrderService {
         return new ApiResponseDTO(Messages.ORDER_UPDATED_NOTIF);
     }
 
-    // FIX: lambdy teraz dostarczają endDateTime do metod findAvailable*
     public AvailabilityDTO checkAvailability(double durationHours, int startHour) {
         Calendar now = Calendar.getInstance();
         now.set(Calendar.HOUR_OF_DAY, startHour);

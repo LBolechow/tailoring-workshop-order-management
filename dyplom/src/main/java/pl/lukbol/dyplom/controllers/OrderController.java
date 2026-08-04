@@ -103,10 +103,9 @@ public class OrderController {
     }
 
     @DeleteMapping("/order/delete/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteOrder(@PathVariable Long id) {
-
-        orderService.deleteOrder(id);
+    public ResponseEntity<ApiResponseDTO> deleteOrder(@PathVariable Long id) {
+        ApiResponseDTO response = orderService.deleteOrder(id);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/order/search")

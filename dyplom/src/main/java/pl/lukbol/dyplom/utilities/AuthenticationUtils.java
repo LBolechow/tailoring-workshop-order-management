@@ -4,6 +4,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import pl.lukbol.dyplom.common.Messages;
+import pl.lukbol.dyplom.exceptions.ApplicationException;
 
 public class AuthenticationUtils {
 
@@ -15,13 +17,11 @@ public class AuthenticationUtils {
         } else if (authentication instanceof UserDetails userDetails) {
             return userDetails.getUsername();
         } else if (authentication instanceof OAuth2AuthenticationToken oauthToken) {
-            String email = oauthToken.getPrincipal().getAttribute(OAUTH_ATTR);
-            return email;
+            return oauthToken.getPrincipal().getAttribute(OAUTH_ATTR);
         } else if (authentication instanceof UsernamePasswordAuthenticationToken oauthToken) {
-            String email = oauthToken.getName();
-            return email;
+            return oauthToken.getName();
         } else {
-            return "notfound";
+            throw new ApplicationException.UserNotFoundException(Messages.USER_NOT_FOUND_BY_EMAIL);
         }
     }
 }

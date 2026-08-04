@@ -46,7 +46,7 @@ public class OrderUtils {
 
     public List<User> findAvailableUsersWithEndDateTime(Date taskStartDateTime, Date taskEndDateTime, int durationMinutes) {
         if (taskStartDateTime == null || taskEndDateTime == null) {
-            throw new IllegalArgumentException("taskStartDateTime i taskEndDateTime nie mogą być null");
+            throw new IllegalArgumentException(Messages.NULL_DATE_EXCEPTION);
         }
 
         List<String> roleNamesToSearch = Arrays.asList(UserRoles.ROLE_EMPLOYEE.name(), UserRoles.ROLE_ADMIN.name());
@@ -76,7 +76,7 @@ public class OrderUtils {
 
     public List<User> findAvailableUserWithEndDateTime(Long employeeId, Date taskStartDateTime, Date taskEndDateTime, int durationMinutes) {
         if (taskStartDateTime == null || taskEndDateTime == null) {
-            throw new IllegalArgumentException("taskStartDateTime i taskEndDateTime nie mogą być null");
+            throw new IllegalArgumentException(Messages.NULL_DATE_EXCEPTION);
         }
 
         List<String> roleNamesToSearch = Arrays.asList(UserRoles.ROLE_EMPLOYEE.name(), UserRoles.ROLE_ADMIN.name());
@@ -104,7 +104,7 @@ public class OrderUtils {
 
     public List<User> findAvailableUsersWithoutEmployee(Long orderId, Date taskStartDateTime, Date taskEndDateTime, int durationMinutes) {
         if (taskStartDateTime == null || taskEndDateTime == null) {
-            throw new IllegalArgumentException("taskStartDateTime i taskEndDateTime nie mogą być null");
+            throw new IllegalArgumentException(Messages.NULL_DATE_EXCEPTION);
         }
 
         List<String> roleNamesToSearch = Arrays.asList(UserRoles.ROLE_EMPLOYEE.name(), UserRoles.ROLE_ADMIN.name());
@@ -154,18 +154,16 @@ public class OrderUtils {
         );
     }
 
-    // FIX: zmieniono "In progress" -> "W trakcie" żeby zgadzało się z wartościami w bazie
     public List<Order> filterInProgressOrders(List<Order> orders) {
         return orders.stream()
-                .filter(order -> "W trakcie".equals(order.getStatus()))
+                .filter(order -> Messages.ORDER_STATUS_IN_PROGRESS.equals(order.getStatus()))
                 .collect(Collectors.toList());
     }
 
-    // FIX: obsługa pustej listy zamiast IndexOutOfBoundsException
     public User findUserByName(String name) {
         List<User> users = userRepository.findByNameContainingIgnoreCase(name);
         if (users.isEmpty()) {
-            throw new ApplicationException.UserNotFoundException("Nie znaleziono użytkownika: " + name);
+            throw new ApplicationException.UserNotFoundException(Messages.USER_NOT_FOUND_BY_NAME + name);
         }
         return users.get(0);
     }
@@ -182,7 +180,7 @@ public class OrderUtils {
             order.setStartDate(DateUtils.parseDate(request.startDate(), "yyyy-MM-dd"));
             order.setEndDate(DateUtils.parseDate(request.endDate(), "yyyy-MM-dd"));
         } catch (ParseException e) {
-            throw new ApplicationException.InvalidDateException("Nieprawidłowy format daty: " + e.getMessage());
+            throw new ApplicationException.InvalidDateException(Messages.INVALID_DATE_FORMAT + e.getMessage());
         }
 
         order.setDuration(request.hours());
@@ -285,7 +283,7 @@ public class OrderUtils {
                 if (!availableUsers.isEmpty()) {
                     return new AvailabilityDTO(
                             true,
-                            "Termin dostępny",
+                            Messages.SLOT_AVAILABLE,
                             DateUtils.formatDateTime(currentDateTime),
                             DateUtils.formatDateTime(endDateTime),
                             availableUsers.get(0).getName()
@@ -299,7 +297,7 @@ public class OrderUtils {
 
         return new AvailabilityDTO(
                 false,
-                "Brak dostępnych pracowników w ramach dni roboczych.",
+                Messages.NO_AVAILABLE_EMPLOYEES,
                 null,
                 null,
                 null
