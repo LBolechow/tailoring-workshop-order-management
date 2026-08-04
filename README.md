@@ -81,6 +81,7 @@ The original thesis project worked, but the codebase reflected the pace of a fir
 **Testing**
 - Full unit test suite covering every service and utility class (JUnit 5 + Mockito + AssertJ)
 - Business-critical logic — like the availability-scheduling algorithm — covered with dedicated edge-case tests (weekend skipping, workday boundaries, overlapping orders)
+- Swagger documentation
 
 ---
 
@@ -155,7 +156,6 @@ mvn test
 
 - [ ] Integration tests (`@SpringBootTest` + H2)
 - [ ] Request validation (Bean Validation)
-- [ ] OpenAPI / Swagger documentation
 - [ ] Refresh token support
 - [ ] Structured logging (SLF4J)
 
