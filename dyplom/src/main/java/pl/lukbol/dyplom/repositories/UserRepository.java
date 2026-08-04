@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import pl.lukbol.dyplom.classes.User;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,14 +25,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByEmailContainingIgnoreCase(String email);
 
-    List<User> findByRoles_NameContainingIgnoreCase(String role);
+    List<User> findByRole_NameContainingIgnoreCase(String roleName);
 
 
     User findByName(String name);
 
     List<User> findAllByNameNot(String employeeNameOnOrder);
 
-    List<User> findUsersByRoles_NameIn(String... roleNames);
-
+    List<User> findUsersByRole_NameIn(Collection<String> roleNames);
     List<User> findByIdIn(List<Long> ids);
 }

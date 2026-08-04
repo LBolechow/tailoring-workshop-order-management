@@ -57,8 +57,8 @@ public class UserService {
 
     public List<UserDTO> getUsersByRoles() {
         List<User> users = new ArrayList<>();
-        users.addAll(userRepository.findByRoles_NameContainingIgnoreCase(ROLE_NAME_ADMIN));
-        users.addAll(userRepository.findByRoles_NameContainingIgnoreCase(ROLE_NAME_EMPLOYEE));
+        users.addAll(userRepository.findByRole_NameContainingIgnoreCase(ROLE_NAME_ADMIN));
+        users.addAll(userRepository.findByRole_NameContainingIgnoreCase(ROLE_NAME_EMPLOYEE));
         return users.stream()
                 .map(user -> new UserDTO(
                         user.getId(),
@@ -147,7 +147,7 @@ public class UserService {
     public List<UserDTO> getEmployeesAndAdmins(Authentication authentication) {
         String email = AuthenticationUtils.checkmail(authentication.getPrincipal());
         User currentUser = userRepository.findByEmail(email);
-        List<User> users = userRepository.findUsersByRoles_NameIn(ROLE_NAME_EMPLOYEE, ROLE_NAME_ADMIN);
+        List<User> users = userRepository.findUsersByRole_NameIn(List.of(ROLE_NAME_EMPLOYEE, ROLE_NAME_ADMIN));
         users.removeIf(user -> user.getEmail().equalsIgnoreCase(currentUser.getEmail()));
 
         return users.stream()
@@ -186,7 +186,7 @@ public class UserService {
         switch (category.toLowerCase()) {
             case "name" -> users = userRepository.findByNameContainingIgnoreCase(searchText);
             case "email" -> users = userRepository.findByEmailContainingIgnoreCase(searchText);
-            case "role" -> users = userRepository.findByRoles_NameContainingIgnoreCase(searchText);
+            case "role" -> users = userRepository.findByRole_NameContainingIgnoreCase(searchText);
             default -> users = Collections.emptyList();
         }
 
@@ -203,7 +203,7 @@ public class UserService {
 
 
     public List<String> getEmployeeNames() {
-        List<User> users = userRepository.findUsersByRoles_NameIn(ROLE_NAME_EMPLOYEE, ROLE_NAME_ADMIN);
+        List<User> users = userRepository.findUsersByRole_NameIn(List.of(ROLE_NAME_EMPLOYEE, ROLE_NAME_ADMIN));
         return users.stream()
                 .map(User::getName)
                 .distinct()

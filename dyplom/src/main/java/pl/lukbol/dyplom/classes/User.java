@@ -2,8 +2,6 @@ package pl.lukbol.dyplom.classes;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,7 +27,7 @@ public class User {
 
     @Column(unique = true, nullable = false)
     private String email;
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false)
     @JsonIgnore
     private String password;
 

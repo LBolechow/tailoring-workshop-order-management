@@ -17,7 +17,7 @@ import pl.lukbol.dyplom.utilities.JwtUtil;
 
 import java.io.IOException;
 
-@Component
+
 @RequiredArgsConstructor
 public class JwtRequestFilter extends OncePerRequestFilter {
 

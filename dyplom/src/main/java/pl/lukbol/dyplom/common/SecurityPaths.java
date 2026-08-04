@@ -18,7 +18,8 @@ public class SecurityPaths {
             "/order/checkOrder/**",
             "/error",
             "/swagger-ui/**",
-            "/v3/api-docs/**"
+            "/v3/api-docs/**",
+            "/h2-console/**"
     );
     public final String[] CLIENT_EMPLOYEE_ADMIN_PATHS = {
             "/user",
@@ -75,6 +76,7 @@ public class SecurityPaths {
             "/order/checkOrder/**",
             "/error",
             "/swagger-ui/**",
-            "/v3/api-docs/**"
+            "/v3/api-docs/**",
+            "/h2-console/**"
     };
 }

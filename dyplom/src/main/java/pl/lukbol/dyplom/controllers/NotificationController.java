@@ -6,8 +6,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
 import pl.lukbol.dyplom.DTOs.notification.NotificationRequestDTO;
-import pl.lukbol.dyplom.repositories.NotificationRepository;
-import pl.lukbol.dyplom.repositories.UserRepository;
 import pl.lukbol.dyplom.services.NotificationService;
 
 

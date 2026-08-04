@@ -292,7 +292,7 @@ class UserServiceTest {
         User employee2 = new User("Anna Nowak", "anna2@test.pl", "haslo", true);
         User admin = new User("Admin", "admin@test.pl", "haslo", true);
 
-        when(userRepository.findUsersByRoles_NameIn("ROLE_EMPLOYEE", "ROLE_ADMIN"))
+        when(userRepository.findUsersByRole_NameIn(List.of("ROLE_EMPLOYEE", "ROLE_ADMIN")))
                 .thenReturn(List.of(employee1, employee2, admin));
 
         List<String> result = userService.getEmployeeNames();
