@@ -2,7 +2,6 @@ package pl.lukbol.dyplom.controllers;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
 import pl.lukbol.dyplom.DTOs.price.PriceRequestDTO;
@@ -18,7 +17,6 @@ public class PriceController {
     private final PriceService priceService;
 
     @GetMapping("/prices")
-    @ResponseBody
     public ResponseEntity<List<Price>> getAllPrices() {
         return ResponseEntity.ok(priceService.getAllPrices());
     }

@@ -1,6 +1,5 @@
 package pl.lukbol.dyplom.controllers;
 
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -27,29 +26,15 @@ public class UserController {
     }
 
     @GetMapping("/users/findByRole")
-    @ResponseBody
     public ResponseEntity<List<UserDTO>> getUsersByRoles() {
         List<UserDTO> response = userService.getUsersByRoles();
         return ResponseEntity.ok(response);
     }
-/*
-    @GetMapping("/panel_administratora")
-    public ModelAndView displayAllUsers(Authentication authentication,
-                                        @RequestParam(name = "page", defaultValue = "0") int page,
-                                        @RequestParam(name = "size", defaultValue = "10") int size) {
-        return userService.getAllUsers(page, size);
-    }
-*/
+
     @PostMapping(value = "/register", consumes = {"*/*"})
     public ResponseEntity<ApiResponseDTO> registerUser(@RequestBody RegisterRequestDTO registerRequestDTO) {
         ApiResponseDTO response = userService.registerUser(registerRequestDTO);
         return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/get_message")
-    @ResponseBody
-    public String getMessageFromSession(HttpServletRequest request) {
-        return (String) request.getSession().getAttribute("message");
     }
 
     @GetMapping("/user")

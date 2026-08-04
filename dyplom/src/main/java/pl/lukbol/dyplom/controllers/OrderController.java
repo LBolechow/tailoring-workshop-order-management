@@ -2,10 +2,8 @@ package pl.lukbol.dyplom.controllers;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import pl.lukbol.dyplom.DTOs.date.CurrentDateDTO;
 import pl.lukbol.dyplom.DTOs.order.*;
@@ -45,7 +43,6 @@ public class OrderController {
     }
 
     @GetMapping(value = "/order/getDailyOrders")
-    @ResponseBody
     public ResponseEntity<List<OrderDTO>> getDailyOrders(
             Authentication authentication,
             @RequestBody OrderRequestByDateDTO orderRequestDTO
@@ -69,7 +66,6 @@ public class OrderController {
     }
 
     @PostMapping(value = "/order/edit/{id}", consumes = "application/json")
-    @ResponseBody
     public ResponseEntity<ApiResponseDTO> editOrder(@PathVariable Long id, @RequestBody EditOrderDTO request) {
         ApiResponseDTO response = orderService.editOrder(id, request);
         return ResponseEntity.ok(response);
