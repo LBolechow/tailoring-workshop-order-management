@@ -27,11 +27,10 @@ public class User {
 
     private String name;
 
-    @Column(unique = true)
-    @NotNull
-    @NotEmpty
+    @Column(unique = true, nullable = false)
     private String email;
-
+    @Column(unique = true, nullable = false)
+    @JsonIgnore
     private String password;
 
     private boolean enabled;
@@ -43,7 +42,7 @@ public class User {
     @ManyToOne
     @JoinColumn(name = "role_id", referencedColumnName = "id")
     private Role role;
-    @ManyToMany(mappedBy = "participants", cascade = CascadeType.ALL)
+    @ManyToMany(mappedBy = "participants", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JsonIgnore
     private List<Conversation> conversations;
 

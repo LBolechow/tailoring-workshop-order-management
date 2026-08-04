@@ -1,6 +1,8 @@
 package pl.lukbol.dyplom.configs;
 
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,6 +18,7 @@ import java.util.Collection;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class SetupDataLoader implements ApplicationListener<ContextRefreshedEvent> {
 
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
@@ -25,24 +28,21 @@ public class SetupDataLoader implements ApplicationListener<ContextRefreshedEven
     private static final String PRIVILEGE_READ = "READ_PRIVILEGE";
     private static final String PRIVILEGE_WRITE = "WRITE_PRIVILEGE";
 
-    private static final String ADMIN_EMAIL = "admin@testowy.com";
-    private static final String ADMIN_NAME = "Admin";
-    private static final String ADMIN_PASSWORD = "admin1234";
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PrivilegeRepository privilegeRepository;
-    private boolean alreadySetup = false;
 
-    public SetupDataLoader(PasswordEncoder passwordEncoder,
-                           UserRepository userRepository,
-                           RoleRepository roleRepository,
-                           PrivilegeRepository privilegeRepository) {
-        this.passwordEncoder = passwordEncoder;
-        this.userRepository = userRepository;
-        this.roleRepository = roleRepository;
-        this.privilegeRepository = privilegeRepository;
-    }
+    @Value("${app.admin.email}")
+    private String adminEmail;
+
+    @Value("${app.admin.name}")
+    private String adminName;
+
+    @Value("${app.admin.password}")
+    private String adminPassword;
+
+    private boolean alreadySetup = false;
 
     @Override
     @Transactional
@@ -56,12 +56,13 @@ public class SetupDataLoader implements ApplicationListener<ContextRefreshedEven
         createRoleIfNotFound(ROLE_EMPLOYEE, List.of(readPrivilege));
         createRoleIfNotFound(ROLE_CLIENT, List.of(readPrivilege));
 
-        if (userRepository.findByEmail(ADMIN_EMAIL) == null) {
+        if (userRepository.findByEmail(adminEmail) == null) {
             Role adminRole = roleRepository.findByName(ROLE_ADMIN);
             User adminUser = new User();
-            adminUser.setName(ADMIN_NAME);
-            adminUser.setPassword(passwordEncoder.encode(ADMIN_PASSWORD));
-            adminUser.setEmail(ADMIN_EMAIL);
+            adminUser.setName(adminName);
+            adminUser.setPassword(passwordEncoder.encode(adminPassword));
+            adminUser.setEmail(adminEmail);
+            adminUser.setEnabled(true);
             adminUser.setRole(adminRole);
             userRepository.save(adminUser);
         }
@@ -90,4 +91,3 @@ public class SetupDataLoader implements ApplicationListener<ContextRefreshedEven
         return role;
     }
 }
-

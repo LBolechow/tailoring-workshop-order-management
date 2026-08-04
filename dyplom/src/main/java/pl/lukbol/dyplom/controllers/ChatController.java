@@ -7,120 +7,103 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import pl.lukbol.dyplom.classes.Conversation;
+import pl.lukbol.dyplom.DTOs.chat.MessageDTO;
+import pl.lukbol.dyplom.DTOs.conversation.ConversationDTO;
+import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
+import pl.lukbol.dyplom.DTOs.user.UserDTO;
 import pl.lukbol.dyplom.classes.Message;
-import pl.lukbol.dyplom.classes.User;
-import pl.lukbol.dyplom.exceptions.ApplicationException;
-import pl.lukbol.dyplom.DTOs.conversation.ConversationResponse;
-import pl.lukbol.dyplom.repositories.ConversationRepository;
-import pl.lukbol.dyplom.repositories.MessageRepository;
 import pl.lukbol.dyplom.services.ChatService;
+import pl.lukbol.dyplom.utilities.AuthenticationUtils;
 
 import java.util.List;
-
-import static pl.lukbol.dyplom.common.Messages.CONVERSATION_NOT_FOUND;
 
 @RestController
 @RequiredArgsConstructor
 public class ChatController {
 
-    private final MessageRepository messageRepository;
-
-    private final ConversationRepository conversationRepository;
-
     private final ChatService chatService;
-
-
 
     @MessageMapping("/sendToConversation/{conversationId}")
     @SendTo("/topic/employees")
-    public Message sendMessageToClient(@DestinationVariable Long conversationId, Message message) {
-        Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
-        if (conversation == null) {
-            throw new ApplicationException.ConversationNotFoundException(CONVERSATION_NOT_FOUND);
-        }
-        return chatService.sendMessageToClient(conversation, message);
-
+    public MessageDTO sendMessageToConversation(@DestinationVariable Long conversationId, Message message) {
+        return chatService.sendMessageToConversation(conversationId, message);
     }
 
     @MessageMapping("/sendToEmployees")
     @SendTo("/topic/employees")
-    public Message sendMessageToEmployees(Message message) {
+    public MessageDTO sendMessageToEmployees(Message message) {
         return chatService.sendMessageToEmployees(message);
     }
 
     @GetMapping("/api/conversation")
-    public ResponseEntity<List<Message>> getClientConversation(Authentication authentication) {
-        return chatService.getClientConversation(authentication);
+    public ResponseEntity<List<MessageDTO>> getClientConversation(Authentication authentication) {
+        return ResponseEntity.ok(chatService.getClientConversation(currentEmail(authentication)));
     }
 
     @GetMapping("/api/employee/conversations")
-    public ResponseEntity<List<Message>> getAllEmployeeConversationMessages(Authentication authentication) {
-        return chatService.getAllEmployeeConversationMessages(authentication);
+    public ResponseEntity<List<MessageDTO>> getAllEmployeeConversationMessages(Authentication authentication) {
+        return ResponseEntity.ok(chatService.getAllEmployeeConversationMessages(currentEmail(authentication)));
     }
 
     @GetMapping("/get_conversations")
-    public List<Conversation> getAllConversations() {
-        List<Conversation> conversations = conversationRepository.findAll();
-        return conversations;
+    public ResponseEntity<List<ConversationDTO>> getAllConversations() {
+        return ResponseEntity.ok(chatService.getAllConversations());
     }
 
     @GetMapping("/conversation/{conversationId}")
-    public ResponseEntity<List<Message>> getMessagesForConversation(@PathVariable Long conversationId) {
-        Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
-
-        if (conversation == null) {
-            throw new ApplicationException.ConversationNotFoundException(CONVERSATION_NOT_FOUND);
-        }
-        List<Message> messages = messageRepository.findByConversation(conversation);
-        return ResponseEntity.ok(messages);
-
+    public ResponseEntity<List<MessageDTO>> getMessagesForConversation(@PathVariable Long conversationId) {
+        return ResponseEntity.ok(chatService.getMessagesForConversation(conversationId));
     }
 
     @GetMapping("/{conversationId}/latest-message")
-    public ResponseEntity<Message> getLatestMessageForConversation(@PathVariable Long conversationId) {
-        Message latestMessage = chatService.getLatestMessageForConversation(conversationId);
-        return ResponseEntity.ok(latestMessage);
+    public ResponseEntity<MessageDTO> getLatestMessageForConversation(@PathVariable Long conversationId) {
+        return ResponseEntity.ok(chatService.getLatestMessageForConversation(conversationId));
     }
 
     @PostMapping("/api/createConversation")
-    public ResponseEntity<ConversationResponse> createConversation(
+    public ResponseEntity<ApiResponseDTO> createConversation(
             Authentication authentication,
             @RequestParam("name") String name,
             @RequestParam("participantIds") String participantIds
     ) {
-        return chatService.createConversation(authentication, name, participantIds);
+        return ResponseEntity.ok(
+                chatService.createConversation(currentEmail(authentication), name, participantIds)
+        );
     }
 
     @PostMapping("/markConversationAsRead/{conversationId}")
-    public ResponseEntity<String> markAllMessagesAsRead(Authentication authentication, @PathVariable Long conversationId) {
-        return chatService.markConversationAsRead(authentication, conversationId);
+    public ResponseEntity<ApiResponseDTO> markConversationAsRead(Authentication authentication,
+                                                                 @PathVariable Long conversationId) {
+        return ResponseEntity.ok(chatService.markConversationAsRead(currentEmail(authentication), conversationId));
     }
 
     @PutMapping("/clearSeenByUserIds/{conversationId}")
-    public ResponseEntity<String> clearSeenByUserIds(@PathVariable Long conversationId) {
-        return chatService.clearSeenByUserIds(conversationId);
+    public ResponseEntity<ApiResponseDTO> clearSeenByUserIds(@PathVariable Long conversationId) {
+        return ResponseEntity.ok(chatService.clearSeenByUserIds(conversationId));
     }
 
     @GetMapping("/checkIfConversationRead/{conversationId}")
-    public ResponseEntity<Boolean> checkIfConversationRead(Authentication authentication, @PathVariable Long conversationId) {
-        return chatService.checkIfConversationRead(authentication, conversationId);
+    public ResponseEntity<Boolean> checkIfConversationRead(Authentication authentication,
+                                                           @PathVariable Long conversationId) {
+        return ResponseEntity.ok(chatService.checkIfConversationRead(currentEmail(authentication), conversationId));
     }
 
     @GetMapping("/getConversationParticipants/{conversationId}")
-    public ResponseEntity<List<User>> getConversationParticipants(@PathVariable Long conversationId) {
-        return chatService.getConversationParticipants(conversationId);
+    public ResponseEntity<List<UserDTO>> getConversationParticipants(@PathVariable Long conversationId) {
+        return ResponseEntity.ok(chatService.getConversationParticipants(conversationId));
     }
 
     @GetMapping("/checkSeen/{conversationId}")
-    public ResponseEntity<List<User>> getParticipantsBySeen(@PathVariable Long conversationId) {
-        return chatService.getParticipantsBySeen(conversationId);
+    public ResponseEntity<List<UserDTO>> getParticipantsBySeen(@PathVariable Long conversationId) {
+        return ResponseEntity.ok(chatService.getParticipantsBySeen(conversationId));
     }
 
     @PostMapping("/hide/{conversationId}")
-    public ResponseEntity<String> hideConversation(@PathVariable Long conversationId) {
-        return chatService.hideConversation(conversationId);
+    public ResponseEntity<ApiResponseDTO> hideConversation(@PathVariable Long conversationId) {
+        return ResponseEntity.ok(chatService.hideConversation(conversationId));
+    }
+
+    private String currentEmail(Authentication authentication) {
+        return AuthenticationUtils.checkmail(authentication.getPrincipal());
     }
 }
-
-

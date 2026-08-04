@@ -27,7 +27,6 @@ public class Messages {
     public static final String NOTIFICATION_CREATED_SUCCESS_MSG = "Powiadomienie zostało utworzone pomyślnie.";
     public static final String PARTICIPANTS_LIST_IS_EMPTY = "Participants list in request is empty.";
     public static final String CONVERSATION_CREATED = "Konwersacja została utworzona pomyślnie.";
-    public static final String CONVERSATION_CREATE_ERROR = "Error creating conversation: ";
     public static final String CONVERSATION_MARKED_AS_READ = "Wiadomości zostały oznaczone jako przeczytane.";
     public static final String CONVERSATION_SEEN_CLEARED = "Lista przeczytanych została wyczyszczona.";
     public static final String CONVERSATION_RESTORED = "Konwersacja została przywrócona.";
@@ -51,8 +50,8 @@ public class Messages {
 
     // Login
     public static final String LOGIN_SUCCESS = "Login successful.";
-    public static final String INVALID_CREDENTIALS = "Invalid email or password.";
-    public static final String LOGIN_FAILED = "Login failed.";
+    public static final String LOGOUT_SUCCESS = "Logout successful.";
+
 
     // E-mail
     public static final String RESET_PASSWORD_EMAIL_SUBJECT = "Twoje nowe hasło!";

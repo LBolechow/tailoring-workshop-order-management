@@ -2,252 +2,299 @@ package pl.lukbol.dyplom.services;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
-import pl.lukbol.dyplom.common.Messages;
+import pl.lukbol.dyplom.DTOs.chat.MessageDTO;
 import pl.lukbol.dyplom.DTOs.chat.SendMessageDTO;
+import pl.lukbol.dyplom.DTOs.conversation.ConversationDTO;
+import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
+import pl.lukbol.dyplom.DTOs.user.UserDTO;
 import pl.lukbol.dyplom.classes.Conversation;
 import pl.lukbol.dyplom.classes.Message;
 import pl.lukbol.dyplom.classes.User;
+import pl.lukbol.dyplom.common.Messages;
 import pl.lukbol.dyplom.exceptions.ApplicationException;
-import pl.lukbol.dyplom.DTOs.conversation.ConversationResponse;
 import pl.lukbol.dyplom.repositories.ConversationRepository;
 import pl.lukbol.dyplom.repositories.MessageRepository;
 import pl.lukbol.dyplom.repositories.UserRepository;
-import pl.lukbol.dyplom.utilities.AuthenticationUtils;
 
-import java.util.*;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ChatService {
 
+    private static final String DATE_PATTERN = "yyyy-MM-dd'T'HH:mm:ss";
+
     private final UserRepository userRepository;
-
-
     private final MessageRepository messageRepository;
-
     private final ConversationRepository conversationRepository;
-
     private final MessageService messageService;
 
-
     @Transactional
-    public Message sendMessageToClient(Conversation conversation, Message message) {
+    public MessageDTO sendMessageToConversation(Long conversationId, Message message) {
+        Conversation conversation = findConversationOrThrow(conversationId);
 
-        SendMessageDTO dto = new SendMessageDTO(message.getSender(), conversation, message.getContent(), message.getMessageDate());
-        messageService.sendMessage(dto);
-        return message;
+        Message saved = messageService.sendMessage(new SendMessageDTO(
+                message.getSender(),
+                conversation,
+                message.getContent(),
+                message.getMessageDate()
+        ));
+
+        return toMessageDTO(saved);
     }
 
     @Transactional
-    public Message sendMessageToEmployees(Message message) {
-        String clientEmail = message.getSender().getEmail();
-
-        User client = userRepository.findByEmail(clientEmail);
+    public MessageDTO sendMessageToEmployees(Message message) {
+        User client = findUserByEmailOrThrow(message.getSender().getEmail());
 
         List<Conversation> conversations = conversationRepository.findConversationByClient_Id(client.getId());
-
         if (conversations == null || conversations.isEmpty()) {
-            conversations = new ArrayList<>();
-
-
-            Conversation conversation = new Conversation();
-            conversation.setClient(client);
-            conversation.setName(client.getName());
-            conversation.setOdczyt(false);
-            conversation = conversationRepository.save(conversation);
-            conversations.add(conversation);
-            client.setConversations(conversations);
-            userRepository.save(client);
-
+            conversations = List.of(createClientConversation(client));
         }
 
+        Message lastSaved = null;
         for (Conversation conversation : conversations) {
-            SendMessageDTO dto = new SendMessageDTO( message.getSender(), conversation, message.getContent(), message.getMessageDate());
-            messageService.sendMessage(dto);
+            lastSaved = messageService.sendMessage(new SendMessageDTO(
+                    client,
+                    conversation,
+                    message.getContent(),
+                    message.getMessageDate()
+            ));
             conversation.getSeenByUserIds().clear();
-            conversation.setOdczyt(false);
+            conversation.setHidden(false);
             conversationRepository.save(conversation);
         }
-        return message;
+
+        return toMessageDTO(lastSaved);
     }
 
-    public ResponseEntity<List<Message>> getClientConversation(Authentication authentication) {
-        User user = userRepository.findByEmail(AuthenticationUtils.checkmail(authentication.getPrincipal()));
+    public List<MessageDTO> getClientConversation(String userEmail) {
+        User user = findUserByEmailOrThrow(userEmail);
 
         List<Conversation> conversations = conversationRepository.findConversationByClient_Id(user.getId());
-        if (!conversations.isEmpty()) {
-            List<Message> messages = messageRepository.findByConversation(conversations.get(0));
-            if (!messages.isEmpty()) {
-                return ResponseEntity.ok(messages);
-            } else {
-                return ResponseEntity.notFound().build();
-            }
-        } else {
-            return ResponseEntity.notFound().build();
+        if (conversations.isEmpty()) {
+            throw new ApplicationException.ConversationNotFoundException(Messages.CONVERSATION_NOT_FOUND);
         }
+
+        return toMessageDTOs(messageRepository.findByConversation(conversations.get(0)));
     }
 
-    public ResponseEntity<List<Message>> getAllEmployeeConversationMessages(Authentication authentication) {
-        User user = userRepository.findByEmail(AuthenticationUtils.checkmail(authentication.getPrincipal()));
-        List<Conversation> conversations = conversationRepository.findByParticipants_Id(user.getId());
+    public List<MessageDTO> getAllEmployeeConversationMessages(String userEmail) {
+        User user = findUserByEmailOrThrow(userEmail);
 
-        List<Message> allMessages = new ArrayList<>();
-        conversations.forEach(conversation -> {
-            List<Message> messages = messageRepository.findByConversation(conversation);
-            allMessages.addAll(messages);
-        });
+        List<Message> allMessages = conversationRepository.findByParticipants_Id(user.getId()).stream()
+                .flatMap(conversation -> messageRepository.findByConversation(conversation).stream())
+                .toList();
 
-        if (!allMessages.isEmpty()) {
-            return ResponseEntity.ok(allMessages);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+        return toMessageDTOs(allMessages);
     }
 
-    @Transactional
-    public ResponseEntity<ConversationResponse> createConversation(
-            Authentication authentication,
-            String name,
-            String participantIds
-    ) {
-        User user = userRepository.findByEmail(
-                AuthenticationUtils.checkmail(authentication.getPrincipal())
-        );
-
-        try {
-            List<Long> participantsIdsList = Arrays.stream(participantIds.split(","))
-                    .map(Long::valueOf)
-                    .collect(Collectors.toList());
-
-            List<User> participants = userRepository.findAllById(participantsIdsList);
-            participants.add(user);
-
-            Conversation newConversation = new Conversation(name, participants, new ArrayList<>(), false);
-            conversationRepository.save(newConversation);
-
-            return ResponseEntity.ok(
-                    new ConversationResponse(true, Messages.CONVERSATION_CREATED)
-            );
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ConversationResponse(false,
-                            Messages.CONVERSATION_CREATE_ERROR + e.getMessage()));
-        }
+    public List<MessageDTO> getMessagesForConversation(Long conversationId) {
+        Conversation conversation = findConversationOrThrow(conversationId);
+        return toMessageDTOs(messageRepository.findByConversation(conversation));
     }
 
-    @Transactional
-    public ResponseEntity<String> markConversationAsRead(Authentication authentication, Long conversationId) {
-        User user = userRepository.findByEmail(AuthenticationUtils.checkmail(authentication.getPrincipal()));
-        Optional<Conversation> conversationOptional = conversationRepository.findById(conversationId);
-
-        if (conversationOptional.isPresent()) {
-            Conversation conversation = conversationOptional.get();
-            Set<String> users = conversation.getSeenByUserIds();
-            users.add(user.getId().toString());
-            conversation.setSeenByUserIds(users);
-            conversationRepository.save(conversation);
-
-            return ResponseEntity.ok(Messages.CONVERSATION_MARKED_AS_READ);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+    public List<ConversationDTO> getAllConversations() {
+        return conversationRepository.findAll().stream()
+                .map(this::toConversationDTO)
+                .toList();
     }
 
-    @Transactional
-    public ResponseEntity<String> clearSeenByUserIds(Long conversationId) {
-        Optional<Conversation> conversationOptional = conversationRepository.findById(conversationId);
-
-        if (conversationOptional.isPresent()) {
-            Conversation conversation = conversationOptional.get();
-            conversation.getSeenByUserIds().clear();
-            conversationRepository.save(conversation);
-
-            return ResponseEntity.ok(Messages.CONVERSATION_SEEN_CLEARED);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    public ResponseEntity<Boolean> checkIfConversationRead(Authentication authentication, Long conversationId) {
-        Optional<Conversation> conversationOptional = conversationRepository.findById(conversationId);
-        User user = userRepository.findByEmail(AuthenticationUtils.checkmail(authentication.getPrincipal()));
-
-        if (conversationOptional.isPresent() && user != null) {
-            Conversation conversation = conversationOptional.get();
-            Set<String> seenByUserIds = conversation.getSeenByUserIds();
-            boolean isRead = seenByUserIds.contains(user.getId().toString());
-            return ResponseEntity.ok(isRead);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    public ResponseEntity<List<User>> getConversationParticipants(Long conversationId) {
-        Optional<Conversation> conversationOptional = conversationRepository.findById(conversationId);
-        if (conversationOptional.isPresent()) {
-            Conversation conversation = conversationOptional.get();
-            List<User> participants = new ArrayList<>(conversation.getParticipants());
-            if (participants.isEmpty()) {
-                participants.add(conversation.getClient());
-            }
-            return ResponseEntity.ok(participants);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    public ResponseEntity<List<User>> getParticipantsBySeen(Long conversationId) {
-        Optional<Conversation> conversationOptional = conversationRepository.findById(conversationId);
-        if (conversationOptional.isPresent()) {
-            Conversation conversation = conversationOptional.get();
-            List<User> participants = conversation.getParticipants();
-            Set<String> seenList = conversation.getSeenByUserIds();
-            List<User> seenParticipants = participants.stream()
-                    .filter(user -> seenList.contains(user.getId().toString()))
-                    .collect(Collectors.toList());
-
-            return ResponseEntity.ok(seenParticipants);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    @Transactional
-    public Message getLatestMessageForConversation(Long conversationId) {
-        Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new ApplicationException.ConversationNotFoundException(Messages.CONVERSATION_NOT_FOUND));
+    public MessageDTO getLatestMessageForConversation(Long conversationId) {
+        Conversation conversation = findConversationOrThrow(conversationId);
 
         Message latestMessage = messageRepository.findTopByConversationOrderByMessageDateDesc(conversation);
-
         if (latestMessage == null) {
             throw new ApplicationException.LastMessageNotFoundException(Messages.LAST_MESSAGE_NOT_FOUND);
         }
 
-        return latestMessage;
+        return toMessageDTO(latestMessage);
     }
 
     @Transactional
-    public ResponseEntity<String> hideConversation(Long conversationId) {
-        Optional<Conversation> conversationOptional = conversationRepository.findById(conversationId);
+    public ApiResponseDTO createConversation(String userEmail, String name, String participantIds) {
+        User creator = findUserByEmailOrThrow(userEmail);
 
-        if (conversationOptional.isPresent()) {
-            Conversation conversation = conversationOptional.get();
-            boolean currentlyRead = conversation.isOdczyt();
-            conversation.setOdczyt(!currentlyRead);
-            conversationRepository.save(conversation);
-
-            if (currentlyRead) {
-                return ResponseEntity.ok(Messages.CONVERSATION_RESTORED);
-            } else {
-                return ResponseEntity.ok(Messages.CONVERSATION_HIDDEN);
-            }
-        } else {
-            return ResponseEntity.notFound().build();
+        List<Long> ids = parseParticipantIds(participantIds);
+        List<User> participants = new ArrayList<>(userRepository.findAllById(ids));
+        if (participants.isEmpty()) {
+            throw new ApplicationException.ParticipantsListIsEmptyException(Messages.PARTICIPANTS_LIST_IS_EMPTY);
         }
+        if (participants.stream().noneMatch(p -> p.getId().equals(creator.getId()))) {
+            participants.add(creator);
+        }
+
+        conversationRepository.save(new Conversation(name, participants, new ArrayList<>(), false));
+
+        return new ApiResponseDTO(Messages.CONVERSATION_CREATED);
+    }
+
+    @Transactional
+    public ApiResponseDTO markConversationAsRead(String userEmail, Long conversationId) {
+        User user = findUserByEmailOrThrow(userEmail);
+        Conversation conversation = findConversationOrThrow(conversationId);
+
+        Set<String> seenByUserIds = conversation.getSeenByUserIds();
+        seenByUserIds.add(user.getId().toString());
+        conversation.setSeenByUserIds(seenByUserIds);
+        conversationRepository.save(conversation);
+
+        return new ApiResponseDTO(Messages.CONVERSATION_MARKED_AS_READ);
+    }
+
+    @Transactional
+    public ApiResponseDTO clearSeenByUserIds(Long conversationId) {
+        Conversation conversation = findConversationOrThrow(conversationId);
+
+        conversation.getSeenByUserIds().clear();
+        conversationRepository.save(conversation);
+
+        return new ApiResponseDTO(Messages.CONVERSATION_SEEN_CLEARED);
+    }
+
+    public boolean checkIfConversationRead(String userEmail, Long conversationId) {
+        User user = findUserByEmailOrThrow(userEmail);
+        Conversation conversation = findConversationOrThrow(conversationId);
+
+        return conversation.getSeenByUserIds().contains(user.getId().toString());
+    }
+
+    public List<UserDTO> getConversationParticipants(Long conversationId) {
+        Conversation conversation = findConversationOrThrow(conversationId);
+
+        List<User> participants = new ArrayList<>(conversation.getParticipants());
+        if (participants.isEmpty() && conversation.getClient() != null) {
+            participants.add(conversation.getClient());
+        }
+
+        return toUserDTOs(participants);
+    }
+
+    public List<UserDTO> getParticipantsBySeen(Long conversationId) {
+        Conversation conversation = findConversationOrThrow(conversationId);
+
+        Set<String> seenByUserIds = conversation.getSeenByUserIds();
+        List<User> seenParticipants = conversation.getParticipants().stream()
+                .filter(user -> seenByUserIds.contains(user.getId().toString()))
+                .toList();
+
+        return toUserDTOs(seenParticipants);
+    }
+
+    @Transactional
+    public ApiResponseDTO hideConversation(Long conversationId) {
+        Conversation conversation = findConversationOrThrow(conversationId);
+
+        boolean currentlyHidden = conversation.isHidden();
+        conversation.setHidden(!currentlyHidden);
+        conversationRepository.save(conversation);
+
+        return new ApiResponseDTO(
+                currentlyHidden ? Messages.CONVERSATION_RESTORED : Messages.CONVERSATION_HIDDEN
+        );
+    }
+
+    // --- helpers ---
+
+    private Conversation createClientConversation(User client) {
+        Conversation conversation = new Conversation();
+        conversation.setClient(client);
+        conversation.setName(client.getName());
+        conversation.setHidden(false);
+        return conversationRepository.save(conversation);
+    }
+
+    private List<Long> parseParticipantIds(String participantIds) {
+        if (participantIds == null || participantIds.isBlank()) {
+            throw new ApplicationException.ParticipantsListIsEmptyException(Messages.PARTICIPANTS_LIST_IS_EMPTY);
+        }
+
+        try {
+            return Arrays.stream(participantIds.split(","))
+                    .map(String::trim)
+                    .filter(id -> !id.isEmpty())
+                    .map(Long::valueOf)
+                    .collect(Collectors.toList());
+        } catch (NumberFormatException e) {
+            throw new ApplicationException.ParticipantsListIsEmptyException(Messages.PARTICIPANTS_LIST_IS_EMPTY);
+        }
+    }
+
+    private Conversation findConversationOrThrow(Long conversationId) {
+        return conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ApplicationException.ConversationNotFoundException(Messages.CONVERSATION_NOT_FOUND));
+    }
+
+    private User findUserByEmailOrThrow(String email) {
+        User user = userRepository.findByEmail(email);
+        if (user == null) {
+            throw new ApplicationException.UserNotFoundException(Messages.USER_NOT_FOUND_BY_EMAIL);
+        }
+        return user;
+    }
+
+    private MessageDTO toMessageDTO(Message message) {
+        if (message == null) {
+            return null;
+        }
+
+        User sender = message.getSender();
+        Conversation conversation = message.getConversation();
+
+        return new MessageDTO(
+                message.getId(),
+                sender != null ? sender.getId() : null,
+                sender != null ? sender.getName() : null,
+                message.getContent(),
+                message.getMessageDate() != null
+                        ? new SimpleDateFormat(DATE_PATTERN).format(message.getMessageDate())
+                        : null,
+                conversation != null ? conversation.getId() : null
+        );
+    }
+
+    private List<MessageDTO> toMessageDTOs(List<Message> messages) {
+        return messages.stream()
+                .map(this::toMessageDTO)
+                .toList();
+    }
+
+    private UserDTO toUserDTO(User user) {
+        if (user == null) {
+            return null;
+        }
+        return new UserDTO(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.isEnabled(),
+                user.getRole() != null ? user.getRole().getName() : null
+        );
+    }
+
+    private List<UserDTO> toUserDTOs(List<User> users) {
+        return users.stream()
+                .filter(Objects::nonNull)
+                .map(this::toUserDTO)
+                .toList();
+    }
+
+    private ConversationDTO toConversationDTO(Conversation conversation) {
+        return new ConversationDTO(
+                conversation.getId(),
+                conversation.getName(),
+                conversation.isHidden(),
+                conversation.getParticipants() != null
+                        ? toUserDTOs(conversation.getParticipants())
+                        : List.of(),
+                toUserDTO(conversation.getClient())
+        );
     }
 }

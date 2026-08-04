@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/your_db
+    username: your_username
+    password: your_password
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: your-google-client-id
+            client-secret: your-google-client-secret
+
+app:
+  admin:
+    email: admin@example.com
+    name: Admin
+    password: change-me
+  cors:
+    allowed-origins: http://localhost:3000
+  oauth2:
+    redirect-url: http://localhost:3000/oauth-success

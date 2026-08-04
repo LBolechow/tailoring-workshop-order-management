@@ -24,7 +24,7 @@ public class Conversation {
 
     private String name;
 
-    private boolean odczyt;
+    private boolean hidden;
 
     @ElementCollection
     private Set<String> seenByUserIds = new HashSet<>();
@@ -45,12 +45,10 @@ public class Conversation {
     @JoinColumn(name = "client_id")
     private User client;
 
-    public Conversation(String name, List<User> participants, List<Message> messages, boolean odczyt) {
+    public Conversation(String name, List<User> participants, List<Message> messages, boolean hidden) {
         this.name = name;
         this.participants = participants;
         this.messages = messages;
-        this.odczyt = odczyt;
+        this.hidden = hidden;
     }
 }
-
-
