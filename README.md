@@ -84,15 +84,6 @@ The original thesis project worked, but the codebase reflected the pace of a fir
 - User-facing and diagnostic messages centralized in a single `Messages` class rather than scattered string literals
 - Structured logging with SLF4J on authentication events, data-modifying operations and unhandled exceptions
 
-**Bugs found and fixed during the rewrite**
-
-Writing the test suite surfaced defects that had been present since the original version:
-
-- The scheduling algorithm could propose time slots in the past, and accepted tasks running past the end of the workday because it compared only the hour and ignored minutes
-- Several exception handlers were silently unreachable — multiple methods shared `@ExceptionHandler(Exception.class)`, so only the first was ever registered
-- Derived query methods referenced a field that no longer existed after the role mapping changed, breaking application startup
-- Missing runtime dependency left the entire JWT signing path non-functional
-
 **Testing**
 - Unit tests covering every service and utility class (JUnit 5 + Mockito + AssertJ)
 - Integration tests for the persistence layer on H2 (`@DataJpaTest`), which catch derived-query and `@EntityGraph` errors that mocked tests cannot
