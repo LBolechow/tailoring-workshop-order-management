@@ -15,11 +15,13 @@ Originally built as an engineering thesis project — a full-stack Spring Boot a
 | Language | Java 17 |
 | Framework | Spring Boot 3 |
 | Security | Spring Security, JWT, OAuth2 (Google) |
-| Persistence | Hibernate / JPA, PostgreSQL |
+| Persistence | Hibernate / JPA, PostgreSQL / H2 |
 | Real-time | WebSocket (STOMP) |
+| Validation | Bean Validation (Hibernate Validator) |
+| Documentation | OpenAPI 3 (springdoc) |
 | Testing | JUnit 5, Mockito, AssertJ |
 | Build | Maven |
-| Other | Lombok, Java Records (DTOs) |
+| Other | Lombok, Java Records (DTOs), SLF4J |
 
 ---
 
@@ -61,27 +63,41 @@ The original thesis project worked, but the codebase reflected the pace of a fir
 **API design**
 - Replaced server-rendered views and raw `Map<String, Object>` payloads with a typed DTO layer built on Java records — explicit, self-documenting request/response contracts
 - Removed the Thymeleaf frontend entirely; the application is now a pure REST API
+- Entities are never exposed over HTTP — every endpoint returns a DTO, so password hashes and lazy relations can't leak into responses
+- Request validation via Bean Validation, with constraint violations mapped to structured `400` responses
 
 **Error handling**
 - Centralized exception handling with `@RestControllerAdvice`
 - Custom exception hierarchy (`ApplicationException`) mapped to consistent, structured JSON error responses with correct HTTP status codes
+- Services throw domain exceptions instead of returning `ResponseEntity` — the HTTP layer stays in the controllers
 
 **Security**
-- JWT-based stateless authentication with token blacklisting on logout
-- Rebuilt OAuth2 (Google) integration with externalized, environment-based configuration — no hardcoded redirect URLs or credentials
+- JWT-based stateless authentication with token invalidation on logout, backed by a blacklist and a scheduled cleanup of expired entries
+- Rebuilt OAuth2 (Google) integration with externalized configuration — no hardcoded redirect URLs or credentials
 - Reworked Spring Security route configuration around explicit per-role access rules
+- Roles defined in a single `UserRole` enum, which also encodes the distinction between the Spring Security role name (`ADMIN`) and the stored authority (`ROLE_ADMIN`)
 
 **Code structure**
 - Constructor injection (`@RequiredArgsConstructor`) throughout — no field injection
 - Thin controllers: `@RestController`, no business logic, pure delegation to services
 - Business logic extracted into dedicated utility classes (`OrderUtils`, `UserUtils`) to keep services focused and testable
 - User-facing and diagnostic messages centralized in a single `Messages` class rather than scattered string literals
-- Fixed logic bugs uncovered during the rewrite (null-handling in scheduling, silently-dead exception handlers, inconsistent transactional boundaries)
+- Structured logging with SLF4J on authentication events, data-modifying operations and unhandled exceptions
+
+**Bugs found and fixed during the rewrite**
+
+Writing the test suite surfaced defects that had been present since the original version:
+
+- The scheduling algorithm could propose time slots in the past, and accepted tasks running past the end of the workday because it compared only the hour and ignored minutes
+- Several exception handlers were silently unreachable — multiple methods shared `@ExceptionHandler(Exception.class)`, so only the first was ever registered
+- Derived query methods referenced a field that no longer existed after the role mapping changed, breaking application startup
+- Missing runtime dependency left the entire JWT signing path non-functional
 
 **Testing**
-- Full unit test suite covering every service and utility class (JUnit 5 + Mockito + AssertJ)
-- Business-critical logic — like the availability-scheduling algorithm — covered with dedicated edge-case tests (weekend skipping, workday boundaries, overlapping orders)
-- Swagger documentation
+- Unit tests covering every service and utility class (JUnit 5 + Mockito + AssertJ)
+- Integration tests for the persistence layer on H2 (`@DataJpaTest`), which catch derived-query and `@EntityGraph` errors that mocked tests cannot
+- Context test (`@SpringBootTest`) guarding against bean conflicts, circular dependencies and invalid configuration
+- Business-critical logic — the availability-scheduling algorithm — covered with dedicated edge-case tests: weekend skipping, workday boundaries, overlapping orders, past-date handling
 
 ---
 
@@ -89,19 +105,19 @@ The original thesis project worked, but the codebase reflected the pace of a fir
 
 ```
 src/main/java/pl/lukbol/dyplom/
-├── classes/          # JPA entities
-├── common/           # Shared constants (Messages, SecurityPaths)
-├── configs/          # Security config, JWT filter, OAuth2 handler
-├── controllers/      # REST controllers
-├── DTOs/             # Request/response records
-├── exceptions/       # Custom exceptions + GlobalExceptionHandler
-├── repositories/     # Spring Data JPA repositories
-├── services/         # Business logic
-└── utilities/        # OrderUtils, UserUtils, JwtUtil, DateUtils, ...
+├── classes/           # JPA entities
+├── common/            # Shared constants (Messages, SecurityPaths, UserRole)
+├── configs/           # Security config, JWT filter, OAuth2 handler, scheduled tasks
+├── controllers/       # REST controllers
+├── DTOs/              # Request/response records
+├── exceptions/        # Custom exceptions + GlobalExceptionHandler
+├── repositories/      # Spring Data JPA repositories
+├── services/          # Business logic
+└── utilities/         # OrderUtils, UserUtils, JwtUtil, DateUtils, ...
 
 src/test/java/pl/lukbol/dyplom/
-├── services/          # Unit tests per service
-└── utilities/         # Unit tests per utility class
+├── unitTests/         # Service and utility unit tests
+└── integrationTests/  # Repository tests on H2
 ```
 
 ---
@@ -110,31 +126,26 @@ src/test/java/pl/lukbol/dyplom/
 
 ### Prerequisites
 - Java 17+
-- PostgreSQL
 - Maven
+- PostgreSQL (optional — H2 file-based database is configured by default)
 
 ### Configuration
 
-Set the following in `application.yml` (or via environment variables):
+Copy the example configuration and fill in your own values:
 
-```yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/your_db
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            client-id: ${GOOGLE_CLIENT_ID}
-            client-secret: ${GOOGLE_CLIENT_SECRET}
-
-app:
-  oauth2:
-    redirect-url: ${OAUTH2_REDIRECT_URL}
+```bash
+cp src/main/resources/application.properties.example src/main/resources/application.properties
 ```
+
+Three values must be set before the first run:
+
+| Property | Notes |
+|---|---|
+| `jwt.secret` | Base64 string, at least 256 bits — e.g. `openssl rand -base64 32` |
+| `spring.security.oauth2.client.registration.google.client-id` | From Google Cloud Console → Credentials |
+| `spring.security.oauth2.client.registration.google.client-secret` | As above |
+
+The database section contains two blocks — H2 (default) and PostgreSQL. Uncomment whichever you need and comment out the other. An administrator account is created automatically on first startup using the `app.admin.*` properties.
 
 ### Run
 
@@ -143,6 +154,16 @@ git clone https://github.com/LBolechow/tailoring-workshop-order-management
 cd tailoring-workshop-order-management
 mvn spring-boot:run
 ```
+
+### API Documentation
+
+With the application running, the interactive OpenAPI documentation is available at:
+
+```
+http://localhost:8080/swagger-ui/index.html
+```
+
+The H2 console (when H2 is enabled) is at `http://localhost:8080/h2-console`.
 
 ### Test
 
@@ -154,10 +175,9 @@ mvn test
 
 ## Roadmap
 
-- [ ] Integration tests (`@SpringBootTest` + H2)
-- [ ] Request validation (Bean Validation)
 - [ ] Refresh token support
-- [ ] Structured logging (SLF4J)
+- [ ] Validation coverage extended to the remaining request DTOs
+- [ ] Date fields typed as `LocalDate` instead of `String` in order DTOs
 
 ---
 
