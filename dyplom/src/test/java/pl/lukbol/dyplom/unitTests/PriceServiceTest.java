@@ -6,6 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.lukbol.dyplom.DTOs.price.PriceDTO;
 import pl.lukbol.dyplom.DTOs.price.PriceRequestDTO;
 import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
 import pl.lukbol.dyplom.classes.Price;
@@ -43,22 +44,22 @@ class PriceServiceTest {
     // getAllPrices
 
     @Test
-    void getAllPrices_shouldReturnAllPrices() {
+    void getAllPrices_shouldMapEntitiesToDTOs() {
         when(priceRepository.findAll()).thenReturn(List.of(price));
 
-        List<Price> result = priceService.getAllPrices();
+        List<PriceDTO> result = priceService.getAllPrices();
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getItem()).isEqualTo("Szycie spodni");
+        assertThat(result.get(0).id()).isEqualTo(1L);
+        assertThat(result.get(0).item()).isEqualTo("Szycie spodni");
+        assertThat(result.get(0).price()).isEqualTo("50");
     }
 
     @Test
     void getAllPrices_shouldReturnEmptyList_whenNoPrices() {
         when(priceRepository.findAll()).thenReturn(List.of());
 
-        List<Price> result = priceService.getAllPrices();
-
-        assertThat(result).isEmpty();
+        assertThat(priceService.getAllPrices()).isEmpty();
     }
 
     // addPrice

@@ -1,7 +1,9 @@
 package pl.lukbol.dyplom.services;
 
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import pl.lukbol.dyplom.DTOs.price.PriceDTO;
 import pl.lukbol.dyplom.DTOs.price.PriceRequestDTO;
 import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
 import pl.lukbol.dyplom.classes.Price;
@@ -12,18 +14,15 @@ import pl.lukbol.dyplom.repositories.PriceRepository;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class PriceService {
 
     private final PriceRepository priceRepository;
 
-    public PriceService(PriceRepository priceRepository) {
-        this.priceRepository = priceRepository;
-
-    }
-
-    public List<Price> getAllPrices() {
-        List<Price> prices = priceRepository.findAll();
-        return prices;
+    public List<PriceDTO> getAllPrices() {
+        return priceRepository.findAll().stream()
+                .map(this::toPriceDTO)
+                .toList();
     }
 
     @Transactional
@@ -49,6 +48,9 @@ public class PriceService {
         price.setPrice(priceRequestDTO.price());
         priceRepository.save(price);
         return new ApiResponseDTO(Messages.UPDATE_PRICE_MESSAGE);
+    }
 
+    private PriceDTO toPriceDTO(Price price) {
+        return new PriceDTO(price.getId(), price.getItem(), price.getPrice());
     }
 }

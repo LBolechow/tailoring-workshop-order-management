@@ -1,0 +1,58 @@
+server.port=8080
+
+# ==========================================================
+# BAZA DANYCH - odkomentuj JEDEN blok, drugi zostaw zakomentowany
+# ==========================================================
+
+# ---------- H2 (plik lokalny, nie wymaga instalacji) ----------
+spring.datasource.url=jdbc:h2:file:./data/dyplom;DB_CLOSE_ON_EXIT=FALSE
+spring.datasource.driver-class-name=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+
+# ---------- PostgreSQL ----------
+#spring.datasource.url=jdbc:postgresql://localhost:5432/your_db
+#spring.datasource.driver-class-name=org.postgresql.Driver
+#spring.datasource.username=your_username
+#spring.datasource.password=your_password
+#spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+#spring.h2.console.enabled=false
+
+# ==========================================================
+# JPA / HIBERNATE
+# ==========================================================
+spring.jpa.hibernate.ddl-auto=update
+
+# ==========================================================
+# JWT
+# Sekret musi byc poprawnym ciagiem Base64 o dlugosci min. 256 bitow.
+# Wygenerujesz go np. przez: openssl rand -base64 32
+# ==========================================================
+jwt.secret=your-base64-encoded-secret
+jwt.expiration=36000000
+
+# ==========================================================
+# APLIKACJA
+# Konto administratora zakladane automatycznie przy pierwszym starcie.
+# ==========================================================
+app.admin.email=admin@example.com
+app.admin.name=Admin
+app.admin.password=change-me
+app.cors.allowed-origins=http://localhost:3000
+app.oauth2.redirect-url=http://localhost:3000/oauth-success
+
+# ==========================================================
+# OAUTH2 - GOOGLE
+# Dane z Google Cloud Console -> APIs & Services -> Credentials
+# ==========================================================
+spring.security.oauth2.client.registration.google.client-id=your-google-client-id
+spring.security.oauth2.client.registration.google.client-secret=your-google-client-secret
+
+# ==========================================================
+# LOGOWANIE
+# ==========================================================
+logging.level.pl.lukbol.dyplom=INFO
+logging.level.org.hibernate.SQL=WARN
