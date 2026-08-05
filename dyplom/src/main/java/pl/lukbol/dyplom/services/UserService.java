@@ -3,6 +3,7 @@ package pl.lukbol.dyplom.services;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -78,6 +80,8 @@ public class UserService {
         newUser.setRole(clientRole);
         userUtils.addWelcomeNotification(newUser);
         userRepository.save(newUser);
+        log.info("Zarejestrowano nowego uzytkownika: {}", registerRequestDTO.email());
+
         return new ApiResponseDTO(Messages.ACCOUNT_CREATED);
     }
 
@@ -124,6 +128,7 @@ public class UserService {
         userUtils.removeUserFromConversations(user);
 
         userRepository.delete(user);
+        log.info("Usunieto konto uzytkownika id={}", id);
 
         return new ApiResponseDTO(Messages.ACCOUNT_DELETED);
 

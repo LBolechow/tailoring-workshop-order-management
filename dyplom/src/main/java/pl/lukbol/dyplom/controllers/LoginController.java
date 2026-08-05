@@ -3,6 +3,7 @@ package pl.lukbol.dyplom.controllers;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -19,6 +20,7 @@ import pl.lukbol.dyplom.common.Messages;
 import pl.lukbol.dyplom.configs.CustomUserDetailsService;
 import pl.lukbol.dyplom.utilities.JwtUtil;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -36,6 +38,7 @@ public class LoginController {
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.email());
         String token = jwtUtil.generateToken(userDetails.getUsername());
+        log.info("Zalogowano uzytkownika: {}", loginRequest.email());
 
         return ResponseEntity.ok(new AuthResponseDTO(token, Messages.LOGIN_SUCCESS));
     }
@@ -48,6 +51,7 @@ public class LoginController {
         }
 
         jwtUtil.blacklistToken(token);
+        log.info("Wylogowanie - token dodany do blacklisty");
 
         return ResponseEntity.ok(new ApiResponseDTO(Messages.LOGOUT_SUCCESS));
     }

@@ -2,6 +2,7 @@ package pl.lukbol.dyplom.configs;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -18,6 +19,7 @@ import pl.lukbol.dyplom.repositories.UserRepository;
 import java.util.Collection;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class SetupDataLoader implements ApplicationListener<ContextRefreshedEvent> {
@@ -62,9 +64,11 @@ public class SetupDataLoader implements ApplicationListener<ContextRefreshedEven
             adminUser.setEnabled(true);
             adminUser.setRole(adminRole);
             userRepository.save(adminUser);
+            log.info("Utworzono konto administratora: {}", adminEmail);
         }
 
         alreadySetup = true;
+        log.info("Inicjalizacja danych startowych zakonczona");
     }
 
     @Transactional

@@ -1,5 +1,6 @@
 package pl.lukbol.dyplom.exceptions;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import pl.lukbol.dyplom.DTOs.exception.ErrorMessageDTO;
 
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -26,6 +28,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ErrorMessageDTO> handleDatabaseException(DataAccessException ex) {
+        log.error("Blad dostepu do bazy danych: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorMessageDTO(ERROR_MSG, "Database error: " + ex.getMessage()));
     }
@@ -91,6 +94,7 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorMessageDTO> handleAllOtherExceptions(Exception ex) {
+        log.error("Nieobslugiwany wyjatek: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorMessageDTO(ERROR_MSG, "Unexpected error: " + ex.getMessage()));
     }

@@ -2,6 +2,7 @@ package pl.lukbol.dyplom.services;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ import java.util.*;
 
 import static pl.lukbol.dyplom.utilities.OrderUtils.WARSAW_ZONE;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -79,6 +81,7 @@ public class OrderService {
         List<Material> materials = orderUtils.createMaterialsForOrder(request.items(), newOrder);
         newOrder.setMaterials(materials);
         orderRepository.save(newOrder);
+        log.info("Dodano zlecenie dla klienta {} - pracownik: {}", request.clientName(), request.selectedUser());
 
         return new ApiResponseDTO(Messages.NEW_ORDER_NOTIF);
     }
@@ -193,6 +196,8 @@ public class OrderService {
         }
 
         orderRepository.delete(order);
+        log.info("Usunieto zlecenie id={}", id);
+
         return new ApiResponseDTO(Messages.ORDER_DELETED);
     }
 
