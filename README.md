@@ -63,7 +63,7 @@ The original thesis project worked, but the codebase reflected the pace of a fir
 **API design**
 - Replaced server-rendered views and raw `Map<String, Object>` payloads with a typed DTO layer built on Java records — explicit, self-documenting request/response contracts
 - Removed the Thymeleaf frontend entirely; the application is now a pure REST API
-- Entities are never exposed over HTTP — every endpoint returns a DTO, so password hashes and lazy relations can't leak into responses
+- Endpoints handling user, order and conversation data return DTOs rather than entities, so password hashes and lazy relations can't leak into responses
 - Request validation via Bean Validation, with constraint violations mapped to structured `400` responses
 
 **Error handling**
@@ -84,17 +84,8 @@ The original thesis project worked, but the codebase reflected the pace of a fir
 - User-facing and diagnostic messages centralized in a single `Messages` class rather than scattered string literals
 - Structured logging with SLF4J on authentication events, data-modifying operations and unhandled exceptions
 
-**Bugs found and fixed during the rewrite**
-
-Writing the test suite surfaced defects that had been present since the original version:
-
-- The scheduling algorithm could propose time slots in the past, and accepted tasks running past the end of the workday because it compared only the hour and ignored minutes
-- Several exception handlers were silently unreachable — multiple methods shared `@ExceptionHandler(Exception.class)`, so only the first was ever registered
-- Derived query methods referenced a field that no longer existed after the role mapping changed, breaking application startup
-- Missing runtime dependency left the entire JWT signing path non-functional
-
 **Testing**
-- Unit tests covering every service and utility class (JUnit 5 + Mockito + AssertJ)
+- Unit tests covering the services and the scheduling and JWT utilities (JUnit 5 + Mockito + AssertJ)
 - Integration tests for the persistence layer on H2 (`@DataJpaTest`), which catch derived-query and `@EntityGraph` errors that mocked tests cannot
 - Context test (`@SpringBootTest`) guarding against bean conflicts, circular dependencies and invalid configuration
 - Business-critical logic — the availability-scheduling algorithm — covered with dedicated edge-case tests: weekend skipping, workday boundaries, overlapping orders, past-date handling
