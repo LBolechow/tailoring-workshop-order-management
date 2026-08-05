@@ -16,6 +16,7 @@ import pl.lukbol.dyplom.classes.Privilege;
 import pl.lukbol.dyplom.classes.Role;
 import pl.lukbol.dyplom.classes.User;
 import pl.lukbol.dyplom.common.Messages;
+import pl.lukbol.dyplom.common.UserRole;
 import pl.lukbol.dyplom.repositories.RoleRepository;
 import pl.lukbol.dyplom.repositories.UserRepository;
 
@@ -27,7 +28,6 @@ import java.util.*;
 public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
 
     private static final String EMAIL_ATTR = "email";
-    private static final String DEFAULT_ROLE = "ROLE_CLIENT";
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -62,7 +62,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         newUser.setEmail(email);
         newUser.setName(name != null ? name : email.split("@")[0]);
         newUser.setPassword(passwordEncoder.encode(generatedPassword));
-        newUser.setRole(roleRepository.findByName(DEFAULT_ROLE));
+        newUser.setRole(roleRepository.findByName(UserRole.CLIENT.authority()));
 
         return userRepository.save(newUser);
     }
