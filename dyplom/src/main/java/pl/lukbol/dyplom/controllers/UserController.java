@@ -1,5 +1,6 @@
 package pl.lukbol.dyplom.controllers;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -20,7 +21,7 @@ public class UserController {
 
     @PostMapping("/add")
     public ResponseEntity<ApiResponseDTO> addUser(
-            @RequestBody AddUserDTO addUserDTO) {
+            @Valid @RequestBody AddUserDTO addUserDTO) {
         ApiResponseDTO responseDTO = userService.addUser(addUserDTO);
         return ResponseEntity.ok(responseDTO);
     }
@@ -32,7 +33,7 @@ public class UserController {
     }
 
     @PostMapping(value = "/register", consumes = {"*/*"})
-    public ResponseEntity<ApiResponseDTO> registerUser(@RequestBody RegisterRequestDTO registerRequestDTO) {
+    public ResponseEntity<ApiResponseDTO> registerUser(@Valid @RequestBody RegisterRequestDTO registerRequestDTO) {
         ApiResponseDTO response = userService.registerUser(registerRequestDTO);
         return ResponseEntity.ok(response);
     }
@@ -68,7 +69,7 @@ public class UserController {
     public ResponseEntity<ApiResponseDTO> updateUser(@PathVariable Long id, @RequestBody UpdateUserRequest updateUserRequest) {
 
         ApiResponseDTO response= userService.updateUser(id, updateUserRequest);
-            return ResponseEntity.ok(response);
+        return ResponseEntity.ok(response);
 
     }
 

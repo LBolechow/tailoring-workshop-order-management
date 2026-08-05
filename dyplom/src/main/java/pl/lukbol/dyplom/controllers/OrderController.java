@@ -1,5 +1,6 @@
 package pl.lukbol.dyplom.controllers;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -42,19 +43,18 @@ public class OrderController {
         return ResponseEntity.ok(userOrders);
     }
 
-    @GetMapping(value = "/order/getDailyOrders")
+    @GetMapping("/order/getDailyOrders")
     public ResponseEntity<List<OrderDTO>> getDailyOrders(
             Authentication authentication,
-            @RequestBody OrderRequestByDateDTO orderRequestDTO
-    ) {
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
 
-            List<OrderDTO> ordersData = orderService.getDailyOrders(authentication, orderRequestDTO);
-            return ResponseEntity.ok(ordersData);
-
+        OrderRequestByDateDTO orderRequestDTO = new OrderRequestByDateDTO(startDate, endDate);
+        return ResponseEntity.ok(orderService.getDailyOrders(authentication, orderRequestDTO));
     }
 
     @PostMapping(value = "/order/add", consumes = "application/json")
-    public ResponseEntity<ApiResponseDTO> addOrder(@RequestBody AddOrderDTO addOrderDTO) {
+    public ResponseEntity<ApiResponseDTO> addOrder(@Valid @RequestBody AddOrderDTO addOrderDTO) {
         ApiResponseDTO response = orderService.addOrder(addOrderDTO);
         return ResponseEntity.ok(response);
     }
@@ -66,7 +66,7 @@ public class OrderController {
     }
 
     @PostMapping(value = "/order/edit/{id}", consumes = "application/json")
-    public ResponseEntity<ApiResponseDTO> editOrder(@PathVariable Long id, @RequestBody EditOrderDTO request) {
+    public ResponseEntity<ApiResponseDTO> editOrder(@PathVariable Long id, @Valid @RequestBody EditOrderDTO request) {
         ApiResponseDTO response = orderService.editOrder(id, request);
         return ResponseEntity.ok(response);
     }

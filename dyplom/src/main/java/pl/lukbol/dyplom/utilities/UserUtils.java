@@ -5,10 +5,10 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import pl.lukbol.dyplom.common.Messages;
 import pl.lukbol.dyplom.classes.Conversation;
 import pl.lukbol.dyplom.classes.Notification;
 import pl.lukbol.dyplom.classes.User;
+import pl.lukbol.dyplom.common.Messages;
 import pl.lukbol.dyplom.repositories.ConversationRepository;
 import pl.lukbol.dyplom.repositories.UserRepository;
 

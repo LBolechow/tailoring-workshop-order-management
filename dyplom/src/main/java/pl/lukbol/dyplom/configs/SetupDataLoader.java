@@ -7,6 +7,7 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import pl.lukbol.dyplom.common.UserRole;
 import pl.lukbol.dyplom.classes.Privilege;
 import pl.lukbol.dyplom.classes.Role;
 import pl.lukbol.dyplom.classes.User;
@@ -20,10 +21,6 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class SetupDataLoader implements ApplicationListener<ContextRefreshedEvent> {
-
-    private static final String ROLE_ADMIN = "ROLE_ADMIN";
-    private static final String ROLE_EMPLOYEE = "ROLE_EMPLOYEE";
-    private static final String ROLE_CLIENT = "ROLE_CLIENT";
 
     private static final String PRIVILEGE_READ = "READ_PRIVILEGE";
     private static final String PRIVILEGE_WRITE = "WRITE_PRIVILEGE";
@@ -52,12 +49,12 @@ public class SetupDataLoader implements ApplicationListener<ContextRefreshedEven
         Privilege readPrivilege = createPrivilegeIfNotFound(PRIVILEGE_READ);
         Privilege writePrivilege = createPrivilegeIfNotFound(PRIVILEGE_WRITE);
 
-        createRoleIfNotFound(ROLE_ADMIN, List.of(readPrivilege, writePrivilege));
-        createRoleIfNotFound(ROLE_EMPLOYEE, List.of(readPrivilege));
-        createRoleIfNotFound(ROLE_CLIENT, List.of(readPrivilege));
+        createRoleIfNotFound(UserRole.ADMIN.authority(), List.of(readPrivilege, writePrivilege));
+        createRoleIfNotFound(UserRole.EMPLOYEE.authority(), List.of(readPrivilege));
+        createRoleIfNotFound(UserRole.CLIENT.authority(), List.of(readPrivilege));
 
         if (userRepository.findByEmail(adminEmail) == null) {
-            Role adminRole = roleRepository.findByName(ROLE_ADMIN);
+            Role adminRole = roleRepository.findByName(UserRole.ADMIN.authority());
             User adminUser = new User();
             adminUser.setName(adminName);
             adminUser.setPassword(passwordEncoder.encode(adminPassword));

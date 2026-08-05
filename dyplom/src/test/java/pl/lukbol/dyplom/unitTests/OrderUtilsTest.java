@@ -9,7 +9,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import pl.lukbol.dyplom.DTOs.date.DateRange;
-import pl.lukbol.dyplom.DTOs.material.MaterialDTO;
 import pl.lukbol.dyplom.DTOs.order.*;
 import pl.lukbol.dyplom.classes.Material;
 import pl.lukbol.dyplom.classes.Order;
@@ -22,6 +21,7 @@ import pl.lukbol.dyplom.repositories.OrderRepository;
 import pl.lukbol.dyplom.repositories.UserRepository;
 import pl.lukbol.dyplom.utilities.OrderUtils;
 
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -32,6 +32,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class OrderUtilsTest {
+
+    private static final String DATE_ONLY = "yyyy-MM-dd";
 
     @Mock
     private UserRepository userRepository;
@@ -78,6 +80,29 @@ class OrderUtilsTest {
                 "W trakcie", 100, 2.0, new ArrayList<>(List.of(material)), "CODE-123"
         );
         order.setId(1L);
+    }
+
+    /**
+     * Zwraca najbliższy przyszły dzień o podanym dniu tygodnia i godzinie.
+     * Daty muszą być w przyszłości, bo findNextAvailableSlot nie proponuje
+     * terminów wstecz. Wyliczanie względem "teraz" zamiast hardkodowania
+     * sprawia też, że test nie zestarzeje się z upływem czasu.
+     */
+    private Calendar futureDayAt(int dayOfWeek, int hour, int minute) {
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.DAY_OF_MONTH, 7);
+        while (cal.get(Calendar.DAY_OF_WEEK) != dayOfWeek) {
+            cal.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        cal.set(Calendar.HOUR_OF_DAY, hour);
+        cal.set(Calendar.MINUTE, minute);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal;
+    }
+
+    private String asDate(Calendar cal) {
+        return new SimpleDateFormat(DATE_ONLY).format(cal.getTime());
     }
 
     // isWorkingDay
@@ -338,28 +363,25 @@ class OrderUtilsTest {
 
     @Test
     void findNextAvailableSlot_shouldReturnAvailableSlot_whenUserIsAvailable() {
-        // Ustawiamy datę startową na poniedziałek o 8:00
-        Calendar monday = Calendar.getInstance();
-        monday.set(2024, Calendar.JANUARY, 15, 8, 0, 0);
+        Calendar monday = futureDayAt(Calendar.MONDAY, 8, 0);
 
-        List<User> availableUsers = List.of(employeeUser);
         AvailabilityDTO result = orderUtils.findNextAvailableSlot(
                 monday.getTime(),
                 2.0,
-                (current, end) -> availableUsers
+                (current, end) -> List.of(employeeUser)
         );
 
         assertThat(result.available()).isTrue();
         assertThat(result.message()).isEqualTo(Messages.SLOT_AVAILABLE);
         assertThat(result.userName()).isEqualTo("Anna Nowak");
-        assertThat(result.startDateTime()).isNotNull();
-        assertThat(result.endDateTime()).isNotNull();
+        assertThat(result.startDateTime()).startsWith(asDate(monday));
+        assertThat(result.startDateTime()).endsWith("08:00:00");
+        assertThat(result.endDateTime()).endsWith("10:00:00");
     }
 
     @Test
     void findNextAvailableSlot_shouldReturnNotAvailable_whenNoUsersFound() {
-        Calendar monday = Calendar.getInstance();
-        monday.set(2024, Calendar.JANUARY, 15, 8, 0, 0);
+        Calendar monday = futureDayAt(Calendar.MONDAY, 8, 0);
 
         AvailabilityDTO result = orderUtils.findNextAvailableSlot(
                 monday.getTime(),
@@ -375,45 +397,64 @@ class OrderUtilsTest {
 
     @Test
     void findNextAvailableSlot_shouldSkipWeekends_andFindNextMonday() {
-        // Piątek po 16:00 — powinien przeskoczyć weekend i zacząć od poniedziałku
-        Calendar fridayEvening = Calendar.getInstance();
-        fridayEvening.set(2024, Calendar.JANUARY, 19, 17, 0, 0); // piątek 17:00
+        Calendar fridayEvening = futureDayAt(Calendar.FRIDAY, 17, 0);
 
-        boolean[] firstCall = {true};
+        Calendar expectedMonday = (Calendar) fridayEvening.clone();
+        expectedMonday.add(Calendar.DAY_OF_MONTH, 3);
+
         AvailabilityDTO result = orderUtils.findNextAvailableSlot(
                 fridayEvening.getTime(),
                 2.0,
-                (current, end) -> {
-                    // Zwróć usera dopiero gdy trafimy na poniedziałek
-                    if (current.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY) {
-                        return List.of(employeeUser);
-                    }
-                    return List.of();
-                }
+                (current, end) -> current.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY
+                        ? List.of(employeeUser)
+                        : List.of()
         );
 
         assertThat(result.available()).isTrue();
-        assertThat(result.startDateTime()).contains("2024-01-22"); // następny poniedziałek
+        assertThat(result.startDateTime()).startsWith(asDate(expectedMonday));
+        assertThat(result.startDateTime()).endsWith("08:00:00");
     }
 
     @Test
-    void findNextAvailableSlot_shouldAdvanceToNextDay_whenTaskExceedsWorkdayEnd() {
-        // Zadanie 10h zaczyna się o 8:00 — przekroczy 16:00, więc powinno przejść na następny dzień
-        Calendar monday = Calendar.getInstance();
-        monday.set(2024, Calendar.JANUARY, 15, 8, 0, 0);
+    void findNextAvailableSlot_shouldReturnNotAvailable_whenTaskExceedsWorkdayEnd() {
+        Calendar monday = futureDayAt(Calendar.MONDAY, 8, 0);
 
-        boolean[] secondDayReached = {false};
         AvailabilityDTO result = orderUtils.findNextAvailableSlot(
                 monday.getTime(),
-                10.0, // 10h — przekracza 16:00
-                (current, end) -> {
-                    // Nie powinniśmy nigdy trafić tutaj bo zadanie zawsze przekracza 16:00
-                    secondDayReached[0] = true;
-                    return List.of();
-                }
+                10.0,
+                (current, end) -> List.of(employeeUser)
         );
 
         assertThat(result.available()).isFalse();
+    }
+
+    @Test
+    void findNextAvailableSlot_shouldRejectTaskEndingAfterWorkdayEnd_evenWithinSameHour() {
+        Calendar monday = futureDayAt(Calendar.MONDAY, 8, 0);
+
+        AvailabilityDTO result = orderUtils.findNextAvailableSlot(
+                monday.getTime(),
+                8.5,
+                (current, end) -> List.of(employeeUser)
+        );
+
+        assertThat(result.available()).isFalse();
+    }
+
+    @Test
+    void findNextAvailableSlot_shouldNotProposeSlotInThePast() {
+        Calendar longAgo = Calendar.getInstance();
+        longAgo.add(Calendar.YEAR, -2);
+
+        AvailabilityDTO result = orderUtils.findNextAvailableSlot(
+                longAgo.getTime(),
+                2.0,
+                (current, end) -> List.of(employeeUser)
+        );
+
+        assertThat(result.available()).isTrue();
+        assertThat(result.startDateTime().substring(0, 10))
+                .isGreaterThanOrEqualTo(new SimpleDateFormat(DATE_ONLY).format(new Date()));
     }
 
     // findOrdersForAdmin / findOrdersForUser

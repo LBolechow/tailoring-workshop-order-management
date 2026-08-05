@@ -3,12 +3,13 @@ package pl.lukbol.dyplom.controllers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
-import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 import pl.lukbol.dyplom.DTOs.notification.NotificationRequestDTO;
+import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
 import pl.lukbol.dyplom.services.NotificationService;
-
-
 
 import static pl.lukbol.dyplom.utilities.AuthenticationUtils.checkmail;
 

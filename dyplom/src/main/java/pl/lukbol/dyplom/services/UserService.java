@@ -8,6 +8,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import pl.lukbol.dyplom.common.Messages;
+import pl.lukbol.dyplom.common.UserRole;
 import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
 import pl.lukbol.dyplom.DTOs.user.*;
 import pl.lukbol.dyplom.classes.Role;
@@ -29,10 +30,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class UserService {
-
-    private static final String ROLE_NAME_ADMIN = "ROLE_ADMIN";
-    private static final String ROLE_NAME_EMPLOYEE = "ROLE_EMPLOYEE";
-    private static final String ROLE_NAME_CLIENT = "ROLE_CLIENT";
 
     private final PasswordEncoder passwordEncoder;
     private final UserUtils userUtils;
@@ -57,8 +54,8 @@ public class UserService {
 
     public List<UserDTO> getUsersByRoles() {
         List<User> users = new ArrayList<>();
-        users.addAll(userRepository.findByRole_NameContainingIgnoreCase(ROLE_NAME_ADMIN));
-        users.addAll(userRepository.findByRole_NameContainingIgnoreCase(ROLE_NAME_EMPLOYEE));
+        users.addAll(userRepository.findByRole_NameContainingIgnoreCase(UserRole.ADMIN.authority()));
+        users.addAll(userRepository.findByRole_NameContainingIgnoreCase(UserRole.EMPLOYEE.authority()));
         return users.stream()
                 .map(user -> new UserDTO(
                         user.getId(),
@@ -70,26 +67,14 @@ public class UserService {
                 .toList();
     }
 
-    /*
-    public ModelAndView getAllUsers(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<User> userPage = userRepository.findAll(pageable);
 
-        ModelAndView modelAndView = new ModelAndView("admin");
-        modelAndView.addObject("users", userPage.getContent());
-        modelAndView.addObject("currentPage", userPage.getNumber());
-        modelAndView.addObject("totalPages", userPage.getTotalPages());
-
-        return modelAndView;
-    }
-*/
     @Transactional
     public ApiResponseDTO registerUser(RegisterRequestDTO registerRequestDTO) {
         if (userUtils.emailExists(registerRequestDTO.email())) {
             throw new ApplicationException.UserWithEmailAlreadyExistsException(Messages.EMAIL_ADDRES_ALREADY_EXIST);
         }
         User newUser = userUtils.createUser(registerRequestDTO.name(), registerRequestDTO.email(), registerRequestDTO.password());
-        Role clientRole = roleRepository.findByName(ROLE_NAME_CLIENT);
+        Role clientRole = roleRepository.findByName(UserRole.CLIENT.authority());
         newUser.setRole(clientRole);
         userUtils.addWelcomeNotification(newUser);
         userRepository.save(newUser);
@@ -147,7 +132,7 @@ public class UserService {
     public List<UserDTO> getEmployeesAndAdmins(Authentication authentication) {
         String email = AuthenticationUtils.checkmail(authentication.getPrincipal());
         User currentUser = userRepository.findByEmail(email);
-        List<User> users = userRepository.findUsersByRole_NameIn(List.of(ROLE_NAME_EMPLOYEE, ROLE_NAME_ADMIN));
+        List<User> users = userRepository.findUsersByRole_NameIn(List.of(UserRole.EMPLOYEE.authority(), UserRole.ADMIN.authority()));
         users.removeIf(user -> user.getEmail().equalsIgnoreCase(currentUser.getEmail()));
 
         return users.stream()
@@ -203,7 +188,7 @@ public class UserService {
 
 
     public List<String> getEmployeeNames() {
-        List<User> users = userRepository.findUsersByRole_NameIn(List.of(ROLE_NAME_EMPLOYEE, ROLE_NAME_ADMIN));
+        List<User> users = userRepository.findUsersByRole_NameIn(List.of(UserRole.EMPLOYEE.authority(), UserRole.ADMIN.authority()));
         return users.stream()
                 .map(User::getName)
                 .distinct()
@@ -228,5 +213,3 @@ public class UserService {
 
 
 }
-
-

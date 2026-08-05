@@ -5,6 +5,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import pl.lukbol.dyplom.DTOs.order.OrderDetailsDTO;
 import pl.lukbol.dyplom.common.Messages;
+import pl.lukbol.dyplom.common.UserRole;
 import pl.lukbol.dyplom.DTOs.material.MaterialDTO;
 import pl.lukbol.dyplom.DTOs.date.DateRange;
 import pl.lukbol.dyplom.DTOs.order.AvailabilityDTO;
@@ -29,10 +30,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderUtils {
 
-    public enum UserRoles {
-        ROLE_ADMIN, ROLE_EMPLOYEE, ROLE_CLIENT
-    }
-
     public static final ZoneId WARSAW_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final UserRepository userRepository;
@@ -49,7 +46,7 @@ public class OrderUtils {
             throw new IllegalArgumentException(Messages.NULL_DATE_EXCEPTION);
         }
 
-        List<String> roleNamesToSearch = Arrays.asList(UserRoles.ROLE_EMPLOYEE.name(), UserRoles.ROLE_ADMIN.name());
+        List<String> roleNamesToSearch = List.of(UserRole.EMPLOYEE.authority(), UserRole.ADMIN.authority());
         List<User> availableUsers = new ArrayList<>();
 
         for (User user : userRepository.findAll()) {
@@ -79,7 +76,7 @@ public class OrderUtils {
             throw new IllegalArgumentException(Messages.NULL_DATE_EXCEPTION);
         }
 
-        List<String> roleNamesToSearch = Arrays.asList(UserRoles.ROLE_EMPLOYEE.name(), UserRoles.ROLE_ADMIN.name());
+        List<String> roleNamesToSearch = List.of(UserRole.EMPLOYEE.authority(), UserRole.ADMIN.authority());
         List<User> availableUsers = new ArrayList<>();
 
         userRepository.findById(employeeId).ifPresent(user -> {
@@ -107,7 +104,7 @@ public class OrderUtils {
             throw new IllegalArgumentException(Messages.NULL_DATE_EXCEPTION);
         }
 
-        List<String> roleNamesToSearch = Arrays.asList(UserRoles.ROLE_EMPLOYEE.name(), UserRoles.ROLE_ADMIN.name());
+        List<String> roleNamesToSearch = List.of(UserRole.EMPLOYEE.authority(), UserRole.ADMIN.authority());
         List<User> availableUsers = new ArrayList<>();
 
         orderRepository.findById(orderId).ifPresent(order -> {
@@ -144,7 +141,7 @@ public class OrderUtils {
 
     public boolean isAdmin(Authentication authentication) {
         return authentication.getAuthorities().stream()
-                .anyMatch(role -> role.getAuthority().equals(UserRoles.ROLE_ADMIN.name()));
+                .anyMatch(role -> role.getAuthority().equals(UserRole.ADMIN.authority()));
     }
 
     public DateRange convertToDateRange(LocalDate fromDate, LocalDate toDate) {
@@ -254,16 +251,25 @@ public class OrderUtils {
             double durationHours,
             BiFunction<Calendar, Calendar, List<User>> availableUsersProvider) {
 
-        Calendar currentDateTime = Calendar.getInstance();
-        currentDateTime.setTime(startDate);
-
         final int WORKDAY_END_HOUR = 16;
         final int START_HOUR = 8;
         final int MAX_DAYS_LOOKAHEAD = 30;
         int daysChecked = 0;
 
+        Calendar currentDateTime = Calendar.getInstance();
+        currentDateTime.setTime(startDate);
+        Calendar now = Calendar.getInstance();
+        if (currentDateTime.before(now)) {
+            currentDateTime = now;
+        }
+
         if (currentDateTime.get(Calendar.HOUR_OF_DAY) >= WORKDAY_END_HOUR) {
             advanceToNextDayStart(currentDateTime, START_HOUR);
+        } else if (currentDateTime.get(Calendar.HOUR_OF_DAY) < START_HOUR) {
+            currentDateTime.set(Calendar.HOUR_OF_DAY, START_HOUR);
+            currentDateTime.set(Calendar.MINUTE, 0);
+            currentDateTime.set(Calendar.SECOND, 0);
+            currentDateTime.set(Calendar.MILLISECOND, 0);
         }
 
         while (daysChecked < MAX_DAYS_LOOKAHEAD) {
@@ -272,7 +278,13 @@ public class OrderUtils {
                 int durationMinutes = (int) (durationHours * 60);
                 endDateTime.add(Calendar.MINUTE, durationMinutes);
 
-                if (endDateTime.get(Calendar.HOUR_OF_DAY) > WORKDAY_END_HOUR) {
+                Calendar workdayEnd = (Calendar) currentDateTime.clone();
+                workdayEnd.set(Calendar.HOUR_OF_DAY, WORKDAY_END_HOUR);
+                workdayEnd.set(Calendar.MINUTE, 0);
+                workdayEnd.set(Calendar.SECOND, 0);
+                workdayEnd.set(Calendar.MILLISECOND, 0);
+
+                if (endDateTime.after(workdayEnd)) {
                     advanceToNextDayStart(currentDateTime, START_HOUR);
                     daysChecked++;
                     continue;
@@ -309,6 +321,7 @@ public class OrderUtils {
         calendar.set(Calendar.HOUR_OF_DAY, startHour);
         calendar.set(Calendar.MINUTE, 0);
         calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
     }
 
     public void updateOrderMaterials(Order order, List<String> items) {

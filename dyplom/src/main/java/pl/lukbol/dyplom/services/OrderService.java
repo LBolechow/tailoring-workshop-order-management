@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import pl.lukbol.dyplom.common.Messages;
+import pl.lukbol.dyplom.common.UserRole;
 import pl.lukbol.dyplom.DTOs.date.CurrentDateDTO;
 import pl.lukbol.dyplom.DTOs.date.DateRange;
 import pl.lukbol.dyplom.DTOs.order.*;
@@ -85,7 +86,7 @@ public class OrderService {
     public List<OrderDTO> getDailyOrders(Authentication authentication, OrderRequestByDateDTO orderRequestDTO) {
         String userEmail = AuthenticationUtils.checkmail(authentication.getPrincipal());
         boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(role -> role.getAuthority().equals("ROLE_ADMIN"));
+                .anyMatch(role -> role.getAuthority().equals(UserRole.ADMIN.authority()));
 
         DateRange dateRange = parseDateRange(orderRequestDTO.startDate(), orderRequestDTO.endDate());
         User user = userRepository.findByEmail(userEmail);

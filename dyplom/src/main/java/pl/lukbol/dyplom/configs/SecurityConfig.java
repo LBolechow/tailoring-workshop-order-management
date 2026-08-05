@@ -12,7 +12,6 @@ import org.springframework.security.config.annotation.authentication.builders.Au
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
@@ -21,6 +20,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import pl.lukbol.dyplom.common.SecurityPaths;
+import pl.lukbol.dyplom.common.UserRole;
 import pl.lukbol.dyplom.utilities.JwtUtil;
 import java.util.List;
 
@@ -48,9 +48,9 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
                 .authorizeHttpRequests(authz -> authz
-                        .requestMatchers(securityPaths.CLIENT_EMPLOYEE_ADMIN_PATHS).hasAnyRole("CLIENT", "EMPLOYEE", "ADMIN")
-                        .requestMatchers(securityPaths.ADMIN_PATHS).hasRole("ADMIN")
-                        .requestMatchers(securityPaths.ADMIN_EMPLOYEE_PATHS).hasAnyRole("ADMIN", "EMPLOYEE")
+                        .requestMatchers(securityPaths.CLIENT_EMPLOYEE_ADMIN_PATHS).hasAnyRole(UserRole.CLIENT.name(), UserRole.EMPLOYEE.name(), UserRole.ADMIN.name())
+                        .requestMatchers(securityPaths.ADMIN_PATHS).hasRole(UserRole.ADMIN.name())
+                        .requestMatchers(securityPaths.ADMIN_EMPLOYEE_PATHS).hasAnyRole(UserRole.ADMIN.name(), UserRole.EMPLOYEE.name())
                         .requestMatchers(securityPaths.PERMIT_ALL_PATHS).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/*").permitAll()
                         .anyRequest().authenticated()
