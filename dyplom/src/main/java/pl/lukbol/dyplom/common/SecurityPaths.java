@@ -12,8 +12,10 @@ import java.util.List;
 public class SecurityPaths {
     public static final List<String> skipFilterUrls = List.of(
             "/api/auth/login",
+            "/api/auth/oauth2/exchange",
             "/register",
-            "/send-new-password",
+            "/forgot-password",
+            "/reset-password",
             "/prices",
             "/order/checkOrder/**",
             "/error",
@@ -70,8 +72,10 @@ public class SecurityPaths {
 
     public final String[] PERMIT_ALL_PATHS = {
             "/api/auth/login",
+            "/api/auth/oauth2/exchange",
             "/register",
-            "/send-new-password",
+            "/forgot-password",
+            "/reset-password",
             "/prices",
             "/order/checkOrder/**",
             "/error",

@@ -51,19 +51,17 @@ class UserUtilsTest {
         user.setNotifications(new ArrayList<>());
     }
 
-    // sendResetEmail
-
+    // Password reset messages must contain a token, not a generated password.
     @Test
-    void sendResetEmail_shouldSendMailWithNewPasswordInBody() {
-        userUtils.sendResetEmail("jan@test.pl", "noweHaslo123");
+    void sendPasswordResetEmail_shouldSendOneTimeToken() {
+        userUtils.sendPasswordResetEmail("jan@test.pl", "example-token");
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(mailSender).send(captor.capture());
-
         SimpleMailMessage sent = captor.getValue();
         assertThat(sent.getTo()).containsExactly("jan@test.pl");
-        assertThat(sent.getSubject()).isEqualTo(Messages.RESET_PASSWORD_EMAIL_SUBJECT);
-        assertThat(sent.getText()).isEqualTo(Messages.RESET_PASSWORD_EMAIL_BODY + "noweHaslo123");
+        assertThat(sent.getSubject()).isEqualTo("Password reset request");
+        assertThat(sent.getText()).contains("example-token", "15 minutes");
     }
 
     // createUser

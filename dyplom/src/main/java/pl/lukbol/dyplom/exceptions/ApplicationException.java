@@ -58,6 +58,13 @@ public class ApplicationException {
             super(message);
         }
     }
+    public static class InvalidOAuth2CodeException extends RuntimeException {
+    }
+
+    public static class InvalidResetTokenException
+            extends RuntimeException {
+    }
+
 
 
 }

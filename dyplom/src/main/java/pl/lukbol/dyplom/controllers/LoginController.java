@@ -18,6 +18,7 @@ import pl.lukbol.dyplom.DTOs.auth.LoginRequestDTO;
 import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
 import pl.lukbol.dyplom.common.Messages;
 import pl.lukbol.dyplom.configs.CustomUserDetailsService;
+import pl.lukbol.dyplom.services.OAuth2CodeService;
 import pl.lukbol.dyplom.utilities.JwtUtil;
 
 @Slf4j
@@ -29,6 +30,10 @@ public class LoginController {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
+
+    private final OAuth2CodeService codeService;
+
+    public record OAuth2ExchangeRequest(String code) {}
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody LoginRequestDTO loginRequest) {
@@ -42,7 +47,17 @@ public class LoginController {
 
         return ResponseEntity.ok(new AuthResponseDTO(token, Messages.LOGIN_SUCCESS));
     }
+    @PostMapping("/oauth2/exchange")
+    public ResponseEntity<AuthResponseDTO> exchange(
+            @Valid @RequestBody OAuth2ExchangeRequest request) {
 
+        String email = codeService.consumeCode(request.code());
+        String token = jwtUtil.generateToken(email);
+
+        return ResponseEntity.ok(
+                new AuthResponseDTO(token, Messages.LOGIN_SUCCESS)
+        );
+    }
     @PostMapping("/logout")
     public ResponseEntity<ApiResponseDTO> logout(HttpServletRequest request) {
         String token = jwtUtil.extractJwtFromRequest(request);

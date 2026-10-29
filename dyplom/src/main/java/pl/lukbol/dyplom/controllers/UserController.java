@@ -82,15 +82,27 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
-    @GetMapping("/user/employees-and-admins")
-    public List<String> getEmployeeNames() {
-        return userService.getEmployeeNames();
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponseDTO> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequestDTO request) {
+
+        return ResponseEntity.ok(
+                userService.forgotPassword(request.email())
+        );
     }
 
-    @PostMapping("/send-new-password")
-    public ResponseEntity<ApiResponseDTO> sendNewPassword(@RequestBody Map<String, String> payload) {
-        ApiResponseDTO response = userService.sendNewPassword(payload);
-        return ResponseEntity.ok(response);
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponseDTO> resetPassword(
+            @Valid @RequestBody ResetPasswordRequestDTO request) {
+
+        return ResponseEntity.ok(
+                userService.resetPassword(
+                        request.token(),
+                        request.newPassword()
+                )
+        );
     }
+
 
 }

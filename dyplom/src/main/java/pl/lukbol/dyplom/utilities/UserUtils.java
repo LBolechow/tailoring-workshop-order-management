@@ -27,13 +27,22 @@ public class UserUtils {
     private final PasswordEncoder passwordEncoder;
 
 
-    public void sendResetEmail(String to, String newPassword) {
+
+    public void sendPasswordResetEmail(String to, String token) {
+
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setSubject(Messages.RESET_PASSWORD_EMAIL_SUBJECT);
-        message.setText(Messages.RESET_PASSWORD_EMAIL_BODY + newPassword);
+
         message.setTo(to);
+        message.setSubject("Password reset request");
+        message.setText(
+                "Use this one-time token to reset your password:\n\n"
+                        + token
+                        + "\n\nThe token expires in 15 minutes."
+        );
+
         mailSender.send(message);
     }
+
 
     public User createUser(String name, String email, String password) {
         return new User(name, email, passwordEncoder.encode(password), false);

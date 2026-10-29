@@ -93,10 +93,16 @@ public class GlobalExceptionHandler {
                 .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorMessageDTO> handleAllOtherExceptions(Exception ex) {
-        log.error("Nieobslugiwany wyjatek: {}", ex.getMessage(), ex);
+    public ResponseEntity<ErrorMessageDTO> handleAllOtherExceptions(
+            Exception ex) {
+
+        log.error("Unhandled application exception", ex);
+
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorMessageDTO(ERROR_MSG, "Unexpected error: " + ex.getMessage()));
+                .body(new ErrorMessageDTO(
+                        ERROR_MSG,
+                        "An unexpected server error occurred"
+                ));
     }
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorMessageDTO> handleValidation(MethodArgumentNotValidException ex) {
@@ -105,4 +111,26 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         return ResponseEntity.badRequest().body(new ErrorMessageDTO(ERROR_MSG, errors));
     }
+    @ExceptionHandler(ApplicationException.InvalidOAuth2CodeException.class)
+    public ResponseEntity<ErrorMessageDTO> handleInvalidOAuth2Code(
+            ApplicationException.InvalidOAuth2CodeException ex) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorMessageDTO(
+                        ERROR_MSG,
+                        "Invalid or expired authorization code"
+                ));
+    }
+    @ExceptionHandler(
+            ApplicationException.InvalidResetTokenException.class
+    )
+    public ResponseEntity<ErrorMessageDTO> handleInvalidResetToken() {
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorMessageDTO(
+                        ERROR_MSG,
+                        "Invalid or expired password reset token"
+                ));
+    }
+
 }

@@ -2,6 +2,7 @@ package pl.lukbol.dyplom.services;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import pl.lukbol.dyplom.DTOs.chat.MessageDTO;
 import pl.lukbol.dyplom.DTOs.chat.SendMessageDTO;
@@ -92,9 +93,28 @@ public class ChatService {
         return toMessageDTOs(allMessages);
     }
 
-    public List<MessageDTO> getMessagesForConversation(Long conversationId) {
+    public List<MessageDTO> getMessagesForConversation(
+            Long conversationId, String userEmail) {
+
         Conversation conversation = findConversationOrThrow(conversationId);
-        return toMessageDTOs(messageRepository.findByConversation(conversation));
+        User user = findUserByEmailOrThrow(userEmail);
+
+        boolean isParticipant =
+                conversation.getParticipants() != null &&
+                        conversation.getParticipants().stream()
+                                .anyMatch(p -> p.getId().equals(user.getId()));
+
+        boolean isClient =
+                conversation.getClient() != null &&
+                        conversation.getClient().getId().equals(user.getId());
+
+        if (!isParticipant && !isClient) {
+            throw new AccessDeniedException("Access denied");
+        }
+
+        return toMessageDTOs(
+                messageRepository.findByConversation(conversation)
+        );
     }
 
     public List<ConversationDTO> getAllConversations() {

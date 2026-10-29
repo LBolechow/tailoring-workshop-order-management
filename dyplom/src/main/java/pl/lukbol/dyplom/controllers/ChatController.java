@@ -51,8 +51,16 @@ public class ChatController {
     }
 
     @GetMapping("/conversation/{conversationId}")
-    public ResponseEntity<List<MessageDTO>> getMessagesForConversation(@PathVariable Long conversationId) {
-        return ResponseEntity.ok(chatService.getMessagesForConversation(conversationId));
+    public ResponseEntity<List<MessageDTO>> getMessagesForConversation(
+            @PathVariable Long conversationId,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(
+                chatService.getMessagesForConversation(
+                        conversationId,
+                        currentEmail(authentication)
+                )
+        );
     }
 
     @GetMapping("/{conversationId}/latest-message")

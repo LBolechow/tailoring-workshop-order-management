@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import pl.lukbol.dyplom.classes.PasswordResetToken;
 import pl.lukbol.dyplom.common.Messages;
 import pl.lukbol.dyplom.common.UserRole;
 import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
@@ -16,12 +17,16 @@ import pl.lukbol.dyplom.classes.Role;
 import pl.lukbol.dyplom.classes.User;
 import pl.lukbol.dyplom.exceptions.ApplicationException;
 import pl.lukbol.dyplom.repositories.MessageRepository;
+import pl.lukbol.dyplom.repositories.PasswordResetTokenRepository;
 import pl.lukbol.dyplom.repositories.RoleRepository;
 import pl.lukbol.dyplom.repositories.UserRepository;
 import pl.lukbol.dyplom.utilities.AuthenticationUtils;
 import pl.lukbol.dyplom.utilities.GenerateCode;
+import pl.lukbol.dyplom.utilities.ResetTokenHasher;
 import pl.lukbol.dyplom.utilities.UserUtils;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +43,9 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final MessageRepository messageRepository;
+
+    private final PasswordResetTokenRepository resetTokenRepository;
+    private final ResetTokenHasher resetTokenHasher;
 
     @Transactional
     public ApiResponseDTO addUser(AddUserDTO addUserDTO) {
@@ -200,21 +208,65 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
-    public ApiResponseDTO sendNewPassword(Map<String, String> payload) {
-        String email = payload.get("email");
+
+    @Transactional
+    public ApiResponseDTO forgotPassword(String email) {
+
+        String responseMessage =
+                "If the account exists, a reset email has been sent.";
+
         User user = userRepository.findByEmail(email);
 
         if (user == null) {
-            throw new ApplicationException.UserNotFoundException(Messages.USER_NOT_FOUND_BY_EMAIL);
+            return new ApiResponseDTO(responseMessage);
         }
 
-        String newPassword = GenerateCode.generateActivationCode();
-        user.setPassword(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
+        resetTokenRepository.deleteByUser_Id(user.getId());
 
-        userUtils.sendResetEmail(email, newPassword);
-        return new ApiResponseDTO(Messages.RESET_PASSWORD_LINK_SENT);
+        String token = GenerateCode.generateResetToken();
+
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setUser(user);
+        resetToken.setTokenHash(resetTokenHasher.hash(token));
+        resetToken.setExpiresAt(
+                Instant.now().plus(15, ChronoUnit.MINUTES)
+        );
+
+        resetTokenRepository.save(resetToken);
+
+        userUtils.sendPasswordResetEmail(email, token);
+
+        return new ApiResponseDTO(responseMessage);
     }
+
+    @Transactional
+    public ApiResponseDTO resetPassword(
+            String token,
+            String newPassword) {
+
+        String tokenHash = resetTokenHasher.hash(token);
+
+        PasswordResetToken resetToken = resetTokenRepository
+                .findByTokenHash(tokenHash)
+                .orElseThrow(
+                        ApplicationException.InvalidResetTokenException::new
+                );
+
+        if (!Instant.now().isBefore(resetToken.getExpiresAt())) {
+            throw new ApplicationException.InvalidResetTokenException();
+        }
+
+        User user = resetToken.getUser();
+        user.setPassword(passwordEncoder.encode(newPassword));
+
+        userRepository.save(user);
+        resetTokenRepository.deleteByUser_Id(user.getId());
+
+        return new ApiResponseDTO(
+                "Password has been reset successfully."
+        );
+    }
+
 
 
 }

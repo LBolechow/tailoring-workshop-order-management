@@ -3,6 +3,7 @@ package pl.lukbol.dyplom.unitTests;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -13,15 +14,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
 import pl.lukbol.dyplom.DTOs.user.*;
 import pl.lukbol.dyplom.classes.Role;
+import pl.lukbol.dyplom.classes.PasswordResetToken;
 import pl.lukbol.dyplom.classes.User;
 import pl.lukbol.dyplom.common.Messages;
 import pl.lukbol.dyplom.exceptions.ApplicationException;
 import pl.lukbol.dyplom.repositories.MessageRepository;
+import pl.lukbol.dyplom.repositories.PasswordResetTokenRepository;
+import pl.lukbol.dyplom.utilities.ResetTokenHasher;
 import pl.lukbol.dyplom.repositories.RoleRepository;
 import pl.lukbol.dyplom.repositories.UserRepository;
 import pl.lukbol.dyplom.services.UserService;
 import pl.lukbol.dyplom.utilities.UserUtils;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -54,6 +59,12 @@ class UserServiceTest {
 
     @Mock
     private UserDetails userDetails;
+
+    @Mock
+    private PasswordResetTokenRepository resetTokenRepository;
+
+    @Mock
+    private ResetTokenHasher resetTokenHasher;
 
     @InjectMocks
     private UserService userService;
@@ -301,28 +312,74 @@ class UserServiceTest {
         assertThat(result).containsExactlyInAnyOrder("Anna Nowak", "Admin");
     }
 
-    // sendNewPassword
+    // Password recovery: requesting a reset must NOT change the password.
 
     @Test
-    void sendNewPassword_shouldResetPasswordAndSendEmail() {
+    void forgotPassword_shouldStoreHashedTokenAndSendEmailWithoutChangingPassword() {
         when(userRepository.findByEmail("jan@test.pl")).thenReturn(user);
-        when(passwordEncoder.encode(any())).thenReturn("encoded_new_password");
+        when(resetTokenHasher.hash(anyString())).thenReturn("token-hash");
+        ArgumentCaptor<PasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(PasswordResetToken.class);
+        ArgumentCaptor<String> rawCaptor = ArgumentCaptor.forClass(String.class);
 
-        ApiResponseDTO result = userService.sendNewPassword(java.util.Map.of("email", "jan@test.pl"));
+        ApiResponseDTO response = userService.forgotPassword("jan@test.pl");
 
-        verify(userRepository).save(user);
-        verify(userUtils).sendResetEmail(eq("jan@test.pl"), any());
-        assertThat(result.message()).isEqualTo(Messages.RESET_PASSWORD_LINK_SENT);
+        verify(resetTokenRepository).deleteByUser_Id(1L);
+        verify(resetTokenRepository).save(tokenCaptor.capture());
+        verify(userUtils).sendPasswordResetEmail(eq("jan@test.pl"), rawCaptor.capture());
+        assertThat(tokenCaptor.getValue().getTokenHash()).isEqualTo("token-hash");
+        assertThat(tokenCaptor.getValue().getUser()).isSameAs(user);
+        assertThat(tokenCaptor.getValue().getExpiresAt()).isAfter(Instant.now());
+        verify(resetTokenHasher).hash(rawCaptor.getValue());
+        assertThat(user.getPassword()).isEqualTo("encoded_haslo");
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any());
+        assertThat(response.message()).isEqualTo("If the account exists, a reset email has been sent.");
     }
 
     @Test
-    void sendNewPassword_shouldThrowUserNotFoundException_whenUserNotFound() {
-        when(userRepository.findByEmail("nieistnieje@test.pl")).thenReturn(null);
+    void forgotPassword_shouldReturnSameMessageForUnknownEmailWithoutSendingEmail() {
+        when(userRepository.findByEmail("missing@test.pl")).thenReturn(null);
+        ApiResponseDTO response = userService.forgotPassword("missing@test.pl");
+        assertThat(response.message()).isEqualTo("If the account exists, a reset email has been sent.");
+        verify(userUtils, never()).sendPasswordResetEmail(anyString(), anyString());
+        verify(resetTokenRepository, never()).save(any());
+    }
 
-        assertThatThrownBy(() -> userService.sendNewPassword(java.util.Map.of("email", "nieistnieje@test.pl")))
-                .isInstanceOf(ApplicationException.UserNotFoundException.class)
-                .hasMessage(Messages.USER_NOT_FOUND_BY_EMAIL);
+    @Test
+    void resetPassword_shouldEncodeAndSavePasswordAndInvalidateTokens() {
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setUser(user);
+        resetToken.setExpiresAt(Instant.now().plusSeconds(600));
+        when(resetTokenHasher.hash("valid-token")).thenReturn("token-hash");
+        when(resetTokenRepository.findByTokenHash("token-hash")).thenReturn(Optional.of(resetToken));
+        when(passwordEncoder.encode("StrongPassword123!")).thenReturn("new-encoded-password");
 
-        verify(userUtils, never()).sendResetEmail(any(), any());
+        ApiResponseDTO response = userService.resetPassword("valid-token", "StrongPassword123!");
+
+        assertThat(user.getPassword()).isEqualTo("new-encoded-password");
+        verify(userRepository).save(user);
+        verify(resetTokenRepository).deleteByUser_Id(1L);
+        assertThat(response.message()).isEqualTo("Password has been reset successfully.");
+    }
+
+    @Test
+    void resetPassword_shouldRejectUnknownToken() {
+        when(resetTokenHasher.hash("unknown")).thenReturn("unknown-hash");
+        when(resetTokenRepository.findByTokenHash("unknown-hash")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> userService.resetPassword("unknown", "StrongPassword123!"))
+                .isInstanceOf(ApplicationException.InvalidResetTokenException.class);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void resetPassword_shouldRejectExpiredToken() {
+        PasswordResetToken token = new PasswordResetToken();
+        token.setUser(user);
+        token.setExpiresAt(Instant.now().minusSeconds(1));
+        when(resetTokenHasher.hash("expired")).thenReturn("expired-hash");
+        when(resetTokenRepository.findByTokenHash("expired-hash")).thenReturn(Optional.of(token));
+        assertThatThrownBy(() -> userService.resetPassword("expired", "StrongPassword123!"))
+                .isInstanceOf(ApplicationException.InvalidResetTokenException.class);
+        verify(userRepository, never()).save(any());
     }
 }

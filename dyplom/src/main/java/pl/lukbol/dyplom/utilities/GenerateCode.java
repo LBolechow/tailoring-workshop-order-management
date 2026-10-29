@@ -1,19 +1,22 @@
+
 package pl.lukbol.dyplom.utilities;
 
-import java.util.Random;
+import java.security.SecureRandom;
+import java.util.Base64;
 
-public class GenerateCode {
-    private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+public final class GenerateCode {
 
-    public static String generateActivationCode() {
-        int codeLength = 12;
-        StringBuilder code = new StringBuilder();
+    private static final SecureRandom SECURE_RANDOM =
+            new SecureRandom();
 
-        for (int i = 0; i < codeLength; i++) {
-            int index = new Random().nextInt(CHARACTERS.length());
-            code.append(CHARACTERS.charAt(index));
-        }
+    private GenerateCode() {}
 
-        return code.toString();
+    public static String generateResetToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(bytes);
     }
 }
