@@ -1,162 +1,182 @@
 # Tailoring Workshop — Order Management System
 
-A REST API backend for managing orders, scheduling, and client/employee communication in a tailoring workshop.
+A Spring Boot REST API for managing tailoring workshop operations, including order scheduling, employee assignments, inventory materials, user management, and real-time communication.
 
-Originally built as an engineering thesis project — a full-stack Spring Boot application with a server-rendered frontend (Thymeleaf, Bootstrap, jQuery). This repository is a ground-up backend rewrite of that project: the same business domain and functionality, rebuilt as a clean, tested, API-only backend following current Spring Boot practices.
+The project is a backend rewrite of an earlier full-stack application developed as an engineering thesis. The original system used Spring Boot, Thymeleaf, Bootstrap, and jQuery. This version retains the business domain while replacing server-rendered views with a REST API, reorganizing the application architecture, and expanding automated testing and security controls.
 
-> Thesis version (full-stack, original submission): [Praca-dyplomowa-SpringBoot-old](https://github.com/LBolechow/Praca-dyplomowa-SpringBoot-old)
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Language | Java 17 |
-| Framework | Spring Boot 3 |
-| Security | Spring Security, JWT, OAuth2 (Google) |
-| Persistence | Hibernate / JPA, PostgreSQL / H2 |
-| Real-time | WebSocket (STOMP) |
-| Validation | Bean Validation (Hibernate Validator) |
-| Documentation | OpenAPI 3 (springdoc) |
-| Testing | JUnit 5, Mockito, AssertJ |
-| Build | Maven |
-| Other | Lombok, Java Records (DTOs), SLF4J |
+**Original thesis implementation:** [Praca-dyplomowa-SpringBoot-old](https://github.com/LBolechow/Praca-dyplomowa-SpringBoot-old)
 
 ---
 
-## Features
+## Technology Stack
 
-**Public**
-- Registration and login (local account or Google OAuth2)
-- Order status lookup by unique code
-- Price list
+| Category          | Technologies                                |
+| ----------------- | ------------------------------------------- |
+| Language          | Java 17                                     |
+| Framework         | Spring Boot 3, Spring Security              |
+| Authentication    | JWT, OAuth2 (Google)                        |
+| Persistence       | Spring Data JPA, Hibernate, PostgreSQL, H2  |
+| Communication     | REST, WebSocket, STOMP                      |
+| Validation        | Jakarta Bean Validation                     |
+| API Documentation | OpenAPI 3, Springdoc                        |
+| Testing           | JUnit 5, Mockito, AssertJ, Spring Boot Test |
+| Build             | Maven                                       |
+| Other             | Lombok, Java Records, SLF4J                 |
 
-**All authenticated users**
-- Profile management
-- Notifications
-- Real-time messaging via WebSocket
+## Core Functionality
 
-**Client role**
-- Full order history (in progress and completed)
-- Direct messaging with employees
+### Order Management
 
-**Employee role**
-- Order calendar — 30-day and daily view (own assignments only)
-- Order creation with automatic scheduling — the system finds the next available time slot and assigns an available employee
-- Order rescheduling to a new slot, same or different employee
-- Materials checklist per order
-- Messaging with clients and other employees
+- Order creation, modification, cancellation, and status tracking.
+- Automatic scheduling based on employee availability and working hours.
+- Employee assignment and order rescheduling.
+- Daily and monthly schedule views.
+- Order history and individual order details.
+- Materials tracking and checklists.
 
-**Administrator role**
-- Everything available to employees, across all staff (full schedule, all materials)
-- Price list management
-- User account management — create, update, delete, assign roles
-- Notification broadcasting to selected employees
+### Users and Access Control
 
----
+The application supports three user roles with differentiated access to resources and operations.
 
-## What Changed From the Original
+| Role          | Capabilities                                                                           |
+| ------------- | -------------------------------------------------------------------------------------- |
+| Client        | Order history, profile management, communication with employees                        |
+| Employee      | Order scheduling, assigned orders, materials management, client communication          |
+| Administrator | User administration, role assignment, pricing management, organization-wide scheduling |
 
-The original thesis project worked, but the codebase reflected the pace of a first full-stack build under a deadline. This version is a rewrite of the backend focused on production-oriented practices:
+Selected functionality, including registration, authentication, pricing information, and order status lookup, is available without an authenticated session.
 
-**API design**
-- Replaced server-rendered views and raw `Map<String, Object>` payloads with a typed DTO layer built on Java records — explicit, self-documenting request/response contracts
-- Removed the Thymeleaf frontend entirely; the application is now a pure REST API
-- Endpoints handling user, order and conversation data return DTOs rather than entities, so password hashes and lazy relations can't leak into responses
-- Request validation via Bean Validation, with constraint violations mapped to structured `400` responses
+### Communication
 
-**Error handling**
-- Centralized exception handling with `@RestControllerAdvice`
-- Custom exception hierarchy (`ApplicationException`) mapped to consistent, structured JSON error responses with correct HTTP status codes
-- Services throw domain exceptions instead of returning `ResponseEntity` — the HTTP layer stays in the controllers
-
-**Security**
-- JWT-based stateless authentication with token invalidation on logout, backed by a blacklist and a scheduled cleanup of expired entries
-- Rebuilt OAuth2 (Google) integration with externalized configuration — no hardcoded redirect URLs or credentials
-- Reworked Spring Security route configuration around explicit per-role access rules
-- Roles defined in a single `UserRole` enum, which also encodes the distinction between the Spring Security role name (`ADMIN`) and the stored authority (`ROLE_ADMIN`)
-
-**Code structure**
-- Constructor injection (`@RequiredArgsConstructor`) throughout — no field injection
-- Thin controllers: `@RestController`, no business logic, pure delegation to services
-- Business logic extracted into dedicated utility classes (`OrderUtils`, `UserUtils`) to keep services focused and testable
-- User-facing and diagnostic messages centralized in a single `Messages` class rather than scattered string literals
-- Structured logging with SLF4J on authentication events, data-modifying operations and unhandled exceptions
-
-**Testing**
-- Unit tests covering the services and the scheduling and JWT utilities (JUnit 5 + Mockito + AssertJ)
-- Integration tests for the persistence layer on H2 (`@DataJpaTest`), which catch derived-query and `@EntityGraph` errors that mocked tests cannot
-- Context test (`@SpringBootTest`) guarding against bean conflicts, circular dependencies and invalid configuration
-- Business-critical logic — the availability-scheduling algorithm — covered with dedicated edge-case tests: weekend skipping, workday boundaries, overlapping orders, past-date handling
+- Real-time messaging using WebSocket and STOMP.
+- Client–employee and employee–employee conversations.
+- Conversation history and read-state tracking.
+- User notifications and administrator broadcasts.
 
 ---
 
-## Project Structure
+## Architecture and Implementation
 
-```
-src/main/java/pl/lukbol/dyplom/
-├── classes/           # JPA entities
-├── common/            # Shared constants (Messages, SecurityPaths, UserRole)
-├── configs/           # Security config, JWT filter, OAuth2 handler, scheduled tasks
-├── controllers/       # REST controllers
-├── DTOs/              # Request/response records
-├── exceptions/        # Custom exceptions + GlobalExceptionHandler
-├── repositories/      # Spring Data JPA repositories
-├── services/          # Business logic
-└── utilities/         # OrderUtils, UserUtils, JwtUtil, DateUtils, ...
+The application follows a layered architecture separating HTTP request handling, business logic, and persistence.
 
-src/test/java/pl/lukbol/dyplom/
-├── unitTests/         # Service and utility unit tests
-└── integrationTests/  # Repository tests on H2
-```
+**API layer**
+
+REST controllers handle request validation and response mapping. Request and response contracts use dedicated DTOs, primarily Java records, rather than exposing persistence entities directly.
+
+**Service layer**
+
+Business operations are implemented in service classes, with shared functionality extracted into dedicated utilities. Domain exceptions are propagated to a centralized exception handler.
+
+**Persistence layer**
+
+Spring Data JPA repositories provide database access. Hibernate manages entity relationships and persistence operations. PostgreSQL is supported alongside H2 for local development and testing.
+
+**Scheduling**
+
+The order scheduling logic evaluates employee availability, working hours, existing assignments, and date constraints to determine valid appointment slots.
+
+**Real-time communication**
+
+WebSocket endpoints support asynchronous messaging and notifications, independently of the REST-based business operations.
+
+### Error Handling
+
+A centralized `@RestControllerAdvice` maps domain and framework exceptions to structured JSON responses.
+
+Error handling distinguishes between validation failures, missing resources, authorization failures, and unexpected server errors. Internal exception details are retained in server logs rather than exposed through generic API error responses.
 
 ---
 
-## Getting Started
+## Authentication and Application Security
 
-### Prerequisites
-- Java 17+
-- Maven
-- PostgreSQL (optional — H2 file-based database is configured by default)
+Security is implemented primarily through Spring Security, with additional application-level authorization checks.
 
-### Configuration
+### Authentication
 
-Copy the example configuration and fill in your own values:
+- JWT-based stateless authentication for REST endpoints.
+- Password hashing through Spring Security's `PasswordEncoder`.
+- JWT invalidation on logout using a token blacklist.
+- Google OAuth2 integration with a short-lived, single-use code exchange mechanism.
+- Role-based authorization using Spring Security authorities.
 
-```bash
-cp src/main/resources/application.properties.example src/main/resources/application.properties
-```
+### Authorization
 
-Three values must be set before the first run:
+Endpoint access is restricted according to user roles.
 
-| Property | Notes |
-|---|---|
-| `jwt.secret` | Base64 string, at least 256 bits — e.g. `openssl rand -base64 32` |
-| `spring.security.oauth2.client.registration.google.client-id` | From Google Cloud Console → Credentials |
-| `spring.security.oauth2.client.registration.google.client-secret` | As above |
+Resource-level authorization is implemented where endpoint-level role checks are insufficient. Conversation access, for example, requires verification that the authenticated user belongs to the requested conversation.
 
-The database section contains two blocks — H2 (default) and PostgreSQL. Uncomment whichever you need and comment out the other. An administrator account is created automatically on first startup using the `app.admin.*` properties.
+This addresses an important distinction between authenticated access and authorization to individual resources, particularly in APIs that expose object identifiers.
 
-### Run
+### Password Recovery
 
-```bash
-git clone https://github.com/LBolechow/tailoring-workshop-order-management
-cd tailoring-workshop-order-management
-mvn spring-boot:run
-```
+Password recovery uses short-lived, single-use reset tokens instead of generating and emailing replacement passwords.
 
-### API Documentation
+Reset tokens are generated using `SecureRandom`, stored as SHA-256 hashes, and expire after 15 minutes. Password changes require successful token verification.
 
-With the application running, the interactive OpenAPI documentation is available at:
+### Security Assessment
 
-```
-http://localhost:8080/swagger-ui/index.html
-```
+The application is also used for practical application security testing and remediation.
 
-The H2 console (when H2 is enabled) is at `http://localhost:8080/h2-console`.
+Tools and techniques include:
 
-### Test
+- **OWASP ZAP (DAST):** active and passive testing of the running REST API.
+- **OpenAPI integration:** importing endpoint definitions for automated security testing.
+- **Authenticated scanning:** testing protected endpoints using JWT authorization headers.
+- **Manual authorization testing:** verifying resource-level access restrictions using separate user identities.
+- **Security regression testing:** validating authentication, authorization, token handling, and error responses after changes.
+
+Security-related refactoring has included improvements to JWT key configuration, object-level authorization, OAuth2 token delivery, password recovery, and exception handling.
+
+### Initial DAST Assessment
+
+An initial OWASP ZAP assessment was performed on October 29, 2026, against a local application instance.
+
+| Severity      | Alert categories |
+| ------------- | ---------------: |
+| High          |                0 |
+| Medium        |                0 |
+| Low           |                2 |
+| Informational |                1 |
+
+The reported findings concerned application error disclosure and debug error messages.
+
+The assessment also produced a high proportion of HTTP 500 responses under automated input mutation. These responses are being investigated to distinguish input validation failures, exception handling issues, and actual application defects.
+
+The results represent a point-in-time assessment rather than a comprehensive security certification.
+
+---
+
+## Automated Testing
+
+The project uses JUnit 5, Mockito, AssertJ, and Spring Boot's testing infrastructure.
+
+### Unit Tests
+
+Unit tests cover service-layer behavior, scheduling rules, authentication utilities, and selected security-sensitive operations.
+
+Scheduling tests include scenarios involving:
+
+- Employee availability and overlapping appointments.
+- Working-hour boundaries.
+- Weekend handling.
+- Invalid or historical dates.
+- Appointment rescheduling.
+
+Security-focused tests include cases involving:
+
+- Unauthorized conversation access.
+- Invalid, expired, and reused authentication or recovery tokens.
+- Password reset behavior.
+- OAuth2 authorization code reuse.
+- Exception handling and response sanitization.
+
+### Integration Tests
+
+Persistence integration tests use `@DataJpaTest` with H2 to verify repository behavior, derived queries, and JPA mappings.
+
+Spring application context tests check dependency injection and configuration initialization.
+
+Run the test suite with:
 
 ```bash
 mvn test
@@ -164,14 +184,127 @@ mvn test
 
 ---
 
-## Roadmap
+## Project Structure
 
-- [ ] Refresh token support
-- [ ] Validation coverage extended to the remaining request DTOs
-- [ ] Date fields typed as `LocalDate` instead of `String` in order DTOs
+```text
+src/
+├── main/
+│   ├── java/pl/lukbol/dyplom/
+│   │   ├── classes/         # JPA entities
+│   │   ├── common/          # Shared constants and security paths
+│   │   ├── configs/         # Security, JWT, OAuth2, WebSocket
+│   │   ├── controllers/     # REST endpoints
+│   │   ├── DTOs/            # Request and response models
+│   │   ├── exceptions/      # Domain exceptions and handlers
+│   │   ├── repositories/    # Spring Data JPA
+│   │   ├── services/        # Business logic
+│   │   └── utilities/       # Shared application utilities
+│   └── resources/           # Application configuration
+└── test/
+    └── java/pl/lukbol/dyplom/
+        ├── unitTests/
+        └── integrationTests/
+```
 
 ---
 
+## Getting Started
+
+### Requirements
+
+- Java 17 or newer
+- Maven
+- PostgreSQL or H2
+
+### Configuration
+
+Clone the repository:
+
+```bash
+git clone https://github.com/LBolechow/tailoring-workshop-order-management.git
+cd tailoring-workshop-order-management
+```
+
+Create the local application configuration:
+
+```bash
+cp src/main/resources/application.properties.example src/main/resources/application.properties
+```
+
+Configure the required properties:
+
+| Property                                                          | Description                                                         |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `jwt.secret`                                                      | Base64-encoded HMAC key containing at least 256 bits of random data |
+| `spring.security.oauth2.client.registration.google.client-id`     | Google OAuth2 client identifier                                     |
+| `spring.security.oauth2.client.registration.google.client-secret` | Google OAuth2 client secret                                         |
+| `app.admin.*`                                                     | Initial administrator account configuration                         |
+
+A suitable JWT signing key can be generated locally:
+
+```bash
+openssl rand -base64 32
+```
+
+Select the appropriate database configuration in `application.properties`. H2 is available for local development, while PostgreSQL can be configured as the primary database.
+
+Google OAuth2 credentials are required when using Google authentication.
+
+### Run
+
+```bash
+mvn spring-boot:run
+```
+
+By default, the application runs at:
+
+```text
+http://localhost:8080
+```
+
+### API Documentation
+
+Swagger UI:
+
+```text
+http://localhost:8080/swagger-ui/index.html
+```
+
+OpenAPI specification:
+
+```text
+http://localhost:8080/v3/api-docs
+```
+
+The API can be tested using Swagger UI, Postman, or other HTTP clients.
+
+---
+
+## Development Roadmap
+
+- [ ] Complete request validation coverage across all endpoints.
+- [ ] Improve handling of malformed requests and unexpected HTTP 500 responses.
+- [ ] Extend object-level authorization checks to remaining conversation operations.
+- [ ] Complete OAuth2 code exchange hardening and end-to-end verification.
+- [ ] Review HTTP security headers, CORS, and Spring Security configuration.
+- [ ] Introduce rate limiting for authentication and password recovery.
+- [ ] Audit third-party dependencies using OWASP Dependency-Check.
+- [ ] Extend security integration and regression testing.
+- [ ] Repeat authenticated DAST assessment following remediation.
+- [ ] Add refresh token support.
+
+---
+
+## Background
+
+The original application was developed as an engineering thesis project at the University of Applied Sciences in Nysa.
+
+The backend rewrite was undertaken to revisit the original implementation with a stronger emphasis on separation of concerns, testability, API design, and security.
+
+The repository is maintained as an independent software engineering project and an environment for continued backend and application security development.
+
 ## Author
 
-**Łukasz Bolechów** — [GitHub](https://github.com/LBolechow)
+**Łukasz Bolechów**
+
+[GitHub](https://github.com/LBolechow) · [LinkedIn](https://www.linkedin.com/in/lukaszbolechow99)
