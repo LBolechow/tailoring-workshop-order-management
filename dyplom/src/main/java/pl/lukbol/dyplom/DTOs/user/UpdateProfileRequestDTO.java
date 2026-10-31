@@ -4,7 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import pl.lukbol.dyplom.common.Messages;
 
-/** The current profile endpoint replaces both the display name and password. */
 public record UpdateProfileRequestDTO(
         @NotBlank(message = Messages.VALIDATION_NAME_REQUIRED)
         @Size(max = 255, message = Messages.VALIDATION_NAME_TOO_LONG)

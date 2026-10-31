@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import pl.lukbol.dyplom.common.Messages;
 
-/** Full user update (PUT), not a partial PATCH. */
 public record UpdateUserRequest(
         @NotBlank(message = Messages.VALIDATION_NAME_REQUIRED)
         @Size(max = 255, message = Messages.VALIDATION_NAME_TOO_LONG)
