@@ -193,19 +193,6 @@ mvn test
 
 ---
 
-## Roadmap
-
-- [ ] Refresh token support
-- [ ] Extend validation coverage to remaining request DTOs
-- [ ] Replace string-based date fields with `LocalDate` where appropriate
-- [ ] Extend object-level authorization checks across conversation operations
-- [ ] Add rate limiting to authentication and password recovery endpoints
-- [ ] Complete OAuth2 code exchange hardening
-- [ ] Review and refine HTTP security headers and CORS configuration
-- [ ] Extend security integration tests
-
----
-
 ## Author
 
 **Łukasz Bolechów** — [GitHub](https://github.com/LBolechow)
