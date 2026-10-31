@@ -3,7 +3,7 @@ package pl.lukbol.dyplom.common;
 import lombok.NoArgsConstructor;
 
 @NoArgsConstructor
-public class Messages {
+public final class Messages {
 
     // User-related messages
     public static final String ACCOUNT_CREATED = "Konto zostało utworzone pomyślnie.";
@@ -12,7 +12,7 @@ public class Messages {
     public static final String ACCOUNT_DELETED = "Konto zostało usunięte pomyślnie.";
     public static final String USER_NOT_FOUND_BY_EMAIL = "Nie znaleziono użytkownika z podanym adresem email.";
     public static final String USER_NOT_FOUND_BY_ID = "Nie znaleziono użytkownika z podanym id.";
-    public static final String RESET_PASSWORD_LINK_SENT = "Nowe hasło zostało wysłane na adres email!";
+    public static final String RESET_PASSWORD_LINK_SENT = "Link do resetowania hasła został wysłany na adres email.";
     public static final String EMAIL_ADDRES_ALREADY_EXIST = "Użytkownik z takim adresem email już istnieje!";
     public static final String USER_ADD_SUCCESS = "Użytkownik został dodany do systemu!";
     public static final String WELCOME_MESSAGE = "Witamy!";
@@ -31,6 +31,21 @@ public class Messages {
     public static final String CONVERSATION_SEEN_CLEARED = "Lista przeczytanych została wyczyszczona.";
     public static final String CONVERSATION_RESTORED = "Konwersacja została przywrócona.";
     public static final String CONVERSATION_HIDDEN = "Konwersacja została ukryta.";
+
+    // Order validation (compile-time constants also usable in Bean Validation annotations)
+    public static final String ORDER_DESCRIPTION_REQUIRED = "Opis zlecenia jest wymagany.";
+    public static final String ORDER_CLIENT_REQUIRED = "Nazwa klienta jest wymagana.";
+    public static final String ORDER_EMAIL_REQUIRED = "Adres email klienta jest wymagany.";
+    public static final String ORDER_EMAIL_INVALID = "Nieprawidłowy format adresu email.";
+    public static final String ORDER_PHONE_REQUIRED = "Numer telefonu jest wymagany.";
+    public static final String ORDER_DURATION_MIN = "Czas realizacji musi wynosić co najmniej 0.5 godziny.";
+    public static final String ORDER_DURATION_MAX = "Czas realizacji nie może przekraczać 8 godzin.";
+    public static final String ORDER_START_REQUIRED = "Data rozpoczęcia jest wymagana.";
+    public static final String ORDER_END_REQUIRED = "Data zakończenia jest wymagana.";
+    public static final String ORDER_EMPLOYEE_REQUIRED = "Pracownik jest wymagany.";
+    public static final String ORDER_PRICE_NONNEGATIVE = "Cena nie może być ujemna.";
+    public static final String ORDER_STATUS_REQUIRED = "Status zlecenia jest wymagany.";
+    public static final String ORDER_ITEMS_REQUIRED = "Lista materiałów jest wymagana.";
 
     // Order-related messages
     public static final String NEW_ORDER_NOTIF = "Pojawiło się nowe zlecenie!";
@@ -54,7 +69,7 @@ public class Messages {
 
 
     // E-mail
-    public static final String RESET_PASSWORD_EMAIL_SUBJECT = "Twoje nowe hasło!";
+    public static final String RESET_PASSWORD_EMAIL_SUBJECT = "Resetowanie hasła";
     public static final String RESET_PASSWORD_EMAIL_BODY = "Twoje nowe hasło to: ";
 
     // OrderUtils
@@ -64,5 +79,29 @@ public class Messages {
     public static final String USER_NOT_FOUND_BY_NAME = "User not found by name: ";
     public static final String NULL_DATE_EXCEPTION = "taskStartDateTime and taskEndDateTime cannot be null.";
     public static final String ORDER_STATUS_IN_PROGRESS = "W trakcie";
+    public static final String CANNOT_DELETE_EMPLOYEE_WITH_ORDERS = "Nie można usunąć pracownika, który ma przypisane zamówienia.";
+    public static final String RESET_MAIL_GENERIC = "If the account exists, a reset email has been sent.";
+    public static final String RESET_PASSWORD_SUCCESS = "Password has been reset successfully.";
+    public static final String CONVERSATION_ACCESS_DENIED = "Access denied";
+    public static final String ORDER_STATUS_COMPLETED = "Zakończone";
+    public static final String ORDER_STATUS_CANCELLED = "Anulowane";
+    public static final String INVALID_ORDER_STATUS = "Nieprawidłowy status zlecenia.";
+    public static final String AMBIGUOUS_EMPLOYEE = "Niejednoznaczna nazwa pracownika: ";
+    public static final String EMPLOYEE_NOT_FOUND = "Nie znaleziono pracownika (id: ";
+    public static final String ORDER_SLOT_CONFLICT = "Pracownik ma już zlecenie w wybranym terminie.";
+    public static final String INVALID_ORDER_RANGE = "Koniec zlecenia musi być późniejszy niż początek.";
+    public static final String INVALID_ORDER_DATE = "Nieprawidłowa data zlecenia. Oczekiwano ISO yyyy-MM-dd'T'HH:mm:ss.";
+    public static final String EMPTY_ORDER_DATE = "Data zlecenia jest wymagana.";
+    public static final String OUTSIDE_WORKING_HOURS = "Zlecenie musi mieścić się w godzinach pracy 08:00–16:00, od poniedziałku do piątku.";
+    public static final String INVALID_BOOKING_DURATION = "Czas realizacji musi odpowiadać przedziałowi dat i wynosić od 30 minut do 8 godzin.";
+    public static final String INVALID_BOOKING_START = "Początek zlecenia musi przypadać na pełną lub połowę godziny.";
+    public static final String ORDER_ACCESS_DENIED = "Brak uprawnień do tego zlecenia.";
+    public static final String INVALID_AUTHENTICATION = "Brak poprawnego uwierzytelnienia.";
+    public static final String INTERNAL_SERVER_ERROR = "An unexpected server error occurred";
+    public static final String INVALID_OAUTH2_CODE = "Invalid or expired authorization code";
+    public static final String INVALID_RESET_TOKEN = "Invalid or expired password reset token";
+    public static final String INVALID_DURATION = "Duration must be greater than zero";
+    public static final String MISSING_DATE = "Start and end dates are required.";
+    public static final String SYSTEM_NOTIFICATION_CREATOR = "System";
 }
 

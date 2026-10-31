@@ -12,6 +12,8 @@ import pl.lukbol.dyplom.DTOs.response.ApiResponseDTO;
 import pl.lukbol.dyplom.classes.Order;
 import pl.lukbol.dyplom.repositories.OrderRepository;
 import pl.lukbol.dyplom.services.OrderService;
+import pl.lukbol.dyplom.services.OrderAccessService;
+import pl.lukbol.dyplom.utilities.DateUtils;
 import pl.lukbol.dyplom.utilities.AuthenticationUtils;
 import pl.lukbol.dyplom.utilities.OrderUtils;
 
@@ -28,6 +30,7 @@ public class OrderController {
     private final OrderService orderService;
 
     private final OrderUtils orderUtils;
+    private final OrderAccessService orderAccessService;
 
 
     @GetMapping("/currentDate")
@@ -54,19 +57,25 @@ public class OrderController {
     }
 
     @PostMapping(value = "/order/add", consumes = "application/json")
-    public ResponseEntity<ApiResponseDTO> addOrder(@Valid @RequestBody AddOrderDTO addOrderDTO) {
+    public ResponseEntity<ApiResponseDTO> addOrder(@Valid @RequestBody AddOrderDTO addOrderDTO,
+                                                   Authentication authentication) {
+        orderAccessService.assertCanAssignEmployee(addOrderDTO.selectedUser(), authentication, orderUtils);
         ApiResponseDTO response = orderService.addOrder(addOrderDTO);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/order/getOrderDetails/{id}")
-    public ResponseEntity<OrderDetailsDTO> getOrderDetails(@PathVariable Long id) {
+    public ResponseEntity<OrderDetailsDTO> getOrderDetails(@PathVariable Long id, Authentication authentication) {
+        orderAccessService.assertCanAccessOrder(id, authentication);
         OrderDetailsDTO orderDetails = orderService.getOrderDetails(id);
         return ResponseEntity.ok(orderDetails);
     }
 
     @PostMapping(value = "/order/edit/{id}", consumes = "application/json")
-    public ResponseEntity<ApiResponseDTO> editOrder(@PathVariable Long id, @Valid @RequestBody EditOrderDTO request) {
+    public ResponseEntity<ApiResponseDTO> editOrder(@PathVariable Long id, @Valid @RequestBody EditOrderDTO request,
+                                                    Authentication authentication) {
+        orderAccessService.assertCanAccessOrder(id, authentication);
+        orderAccessService.assertCanAssignEmployee(request.selectedUser(), authentication, orderUtils);
         ApiResponseDTO response = orderService.editOrder(id, request);
         return ResponseEntity.ok(response);
     }
@@ -83,8 +92,9 @@ public class OrderController {
     @GetMapping("/order/checkAvailabilityNextDay/{orderId}")
     public ResponseEntity<AvailabilityDTO> checkAvailabilityNextDay(
             @PathVariable Long orderId,
-            @RequestParam double durationHours) {
-
+            @RequestParam double durationHours,
+            Authentication authentication) {
+        orderAccessService.assertCanAccessOrder(orderId, authentication);
         AvailabilityDTO availability = orderService.checkAvailabilityNextDay(orderId, durationHours);
         return ResponseEntity.ok(availability);
     }
@@ -92,14 +102,16 @@ public class OrderController {
     @GetMapping("/order/otherEmployee/{orderId}")
     public ResponseEntity<AvailabilityDTO> checkAvailabilityOtherEmployee(
             @PathVariable Long orderId,
-            @RequestParam double durationHours) {
-
+            @RequestParam double durationHours,
+            Authentication authentication) {
+        orderAccessService.assertCanAccessOrder(orderId, authentication);
         AvailabilityDTO availability = orderService.checkAvailabilityOtherEmployee(orderId, durationHours);
         return ResponseEntity.ok(availability);
     }
 
     @DeleteMapping("/order/delete/{id}")
-    public ResponseEntity<ApiResponseDTO> deleteOrder(@PathVariable Long id) {
+    public ResponseEntity<ApiResponseDTO> deleteOrder(@PathVariable Long id, Authentication authentication) {
+        orderAccessService.assertCanAccessOrder(id, authentication);
         ApiResponseDTO response = orderService.deleteOrder(id);
         return ResponseEntity.ok(response);
     }
@@ -118,8 +130,9 @@ public class OrderController {
     @PatchMapping("/material/{materialId}")
     public ResponseEntity<ApiResponseDTO> updateMaterialCheckedState(
             @PathVariable Long materialId,
-            @RequestBody Map<String, Boolean> requestBody) {
-
+            @RequestBody Map<String, Boolean> requestBody,
+            Authentication authentication) {
+        orderAccessService.assertCanAccessMaterial(materialId, authentication);
         boolean checked = requestBody.getOrDefault("checked", false);
 
         ApiResponseDTO response = orderService.updateMaterialCheckedState(materialId, checked);
@@ -129,14 +142,14 @@ public class OrderController {
 
 
     @GetMapping("/order/checkOrder/{idCode}")
-    public ResponseEntity<OrderDetailsDTO> getOrderForClient(@PathVariable String idCode) {
+    public ResponseEntity<PublicOrderTrackingDTO> getOrderForClient(@PathVariable String idCode) {
+        // Tracking code is a bearer secret: never return client contact details or the code.
         Order order = orderRepository.findByIdCode(idCode);
-        if (order != null) {
-            OrderDetailsDTO dto = orderUtils.buildOrderDetailsDTO(order);
-            return ResponseEntity.ok(dto);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+        if (order == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(new PublicOrderTrackingDTO(
+                order.getStatus(),
+                DateUtils.formatOrderDateTime(order.getStartDate()),
+                DateUtils.formatOrderDateTime(order.getEndDate())));
     }
 
 

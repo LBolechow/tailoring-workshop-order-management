@@ -43,6 +43,10 @@ public class ApplicationException {
         }
     }
 
+    public static class OrderSlotConflictException extends RuntimeException {
+        public OrderSlotConflictException(String message) { super(message); }
+    }
+
     public static class OrderNotFoundException extends RuntimeException {
         public OrderNotFoundException(String message) {
             super(message);
@@ -58,6 +62,21 @@ public class ApplicationException {
             super(message);
         }
     }
+    public static class UserHasOrdersException extends RuntimeException {
+        public UserHasOrdersException(String message) { super(message); }
+    }
+
+    public static class AmbiguousEmployeeException extends RuntimeException {
+        public AmbiguousEmployeeException(String message) { super(message); }
+    }
+
+    public static class InvalidOrderStatusException extends RuntimeException {
+        public InvalidOrderStatusException(String message) { super(message); }
+    }
+    public static class OrderAccessDeniedException extends RuntimeException {
+        public OrderAccessDeniedException(String message) { super(message); }
+    }
+
     public static class InvalidOAuth2CodeException extends RuntimeException {
     }
 

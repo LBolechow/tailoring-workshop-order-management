@@ -82,4 +82,35 @@ class DateUtilsTest {
         assertThat(DateUtils.formatDateTime(cal))
                 .startsWith(new SimpleDateFormat("yyyy-MM-dd").format(parsed));
     }
+
+    @Test
+    void parseOrderDateTime_shouldPreserveLocalTimeInWarsaw() {
+        Date parsed = DateUtils.parseOrderDateTime("2026-07-01T09:30:00");
+
+        assertThat(DateUtils.formatOrderDateTime(parsed)).isEqualTo("2026-07-01T09:30:00");
+        assertThat(parsed.toInstant()).isEqualTo(java.time.Instant.parse("2026-07-01T07:30:00Z"));
+    }
+
+    @Test
+    void parseOrderDateTime_shouldRetainLegacyDateOnlyFormat() {
+        Date parsed = DateUtils.parseOrderDateTime("2026-07-01");
+        assertThat(DateUtils.formatOrderDateTime(parsed)).isEqualTo("2026-07-01T00:00:00");
+    }
+
+    @Test
+    void parseOrderDateTime_shouldRejectInvalidCalendarDate() {
+        assertThatThrownBy(() -> DateUtils.parseOrderDateTime("2026-02-30T10:00:00"))
+                .isInstanceOf(pl.lukbol.dyplom.exceptions.ApplicationException.InvalidDateException.class);
+    }
+
+    @Test
+    void parseOrderRange_shouldRejectNonIncreasingInterval() {
+        assertThatThrownBy(() -> DateUtils.parseOrderRange(
+                "2026-11-02T10:00:00", "2026-11-02T10:00:00"))
+                .isInstanceOf(pl.lukbol.dyplom.exceptions.ApplicationException.InvalidDateException.class);
+        assertThatThrownBy(() -> DateUtils.parseOrderRange(
+                "2026-11-02T11:00:00", "2026-11-02T10:00:00"))
+                .isInstanceOf(pl.lukbol.dyplom.exceptions.ApplicationException.InvalidDateException.class);
+    }
+
 }

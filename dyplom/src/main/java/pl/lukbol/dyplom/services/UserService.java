@@ -17,6 +17,7 @@ import pl.lukbol.dyplom.classes.Role;
 import pl.lukbol.dyplom.classes.User;
 import pl.lukbol.dyplom.exceptions.ApplicationException;
 import pl.lukbol.dyplom.repositories.MessageRepository;
+import pl.lukbol.dyplom.repositories.OrderRepository;
 import pl.lukbol.dyplom.repositories.PasswordResetTokenRepository;
 import pl.lukbol.dyplom.repositories.RoleRepository;
 import pl.lukbol.dyplom.repositories.UserRepository;
@@ -43,6 +44,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final MessageRepository messageRepository;
+    private final OrderRepository orderRepository;
 
     private final PasswordResetTokenRepository resetTokenRepository;
     private final ResetTokenHasher resetTokenHasher;
@@ -130,6 +132,11 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ApplicationException.UserNotFoundException(Messages.USER_NOT_FOUND_BY_ID));
 
+        if (orderRepository.existsByEmployee_Id(id)) {
+            throw new ApplicationException.UserHasOrdersException(
+                    Messages.CANNOT_DELETE_EMPLOYEE_WITH_ORDERS);
+        }
+
         messageRepository.deleteBySenderId(id);
 
         userUtils.removeClientFromConversations(id);
@@ -212,8 +219,7 @@ public class UserService {
     @Transactional
     public ApiResponseDTO forgotPassword(String email) {
 
-        String responseMessage =
-                "If the account exists, a reset email has been sent.";
+        String responseMessage = Messages.RESET_MAIL_GENERIC;
 
         User user = userRepository.findByEmail(email);
 
@@ -263,7 +269,7 @@ public class UserService {
         resetTokenRepository.deleteByUser_Id(user.getId());
 
         return new ApiResponseDTO(
-                "Password has been reset successfully."
+                Messages.RESET_PASSWORD_SUCCESS
         );
     }
 

@@ -19,6 +19,7 @@ import pl.lukbol.dyplom.classes.User;
 import pl.lukbol.dyplom.common.Messages;
 import pl.lukbol.dyplom.exceptions.ApplicationException;
 import pl.lukbol.dyplom.repositories.MessageRepository;
+import pl.lukbol.dyplom.repositories.OrderRepository;
 import pl.lukbol.dyplom.repositories.PasswordResetTokenRepository;
 import pl.lukbol.dyplom.utilities.ResetTokenHasher;
 import pl.lukbol.dyplom.repositories.RoleRepository;
@@ -53,6 +54,9 @@ class UserServiceTest {
 
     @Mock
     private MessageRepository messageRepository;
+
+    @Mock
+    private OrderRepository orderRepository;
 
     @Mock
     private Authentication authentication;
@@ -210,6 +214,18 @@ class UserServiceTest {
         verify(userUtils).removeUserFromConversations(user);
         verify(userRepository).delete(user);
         assertThat(result.message()).isEqualTo(Messages.ACCOUNT_DELETED);
+    }
+
+    @Test
+    void deleteUser_shouldRefuseDeletionWhenEmployeeHasOrders() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(orderRepository.existsByEmployee_Id(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.deleteUser(1L))
+                .isInstanceOf(ApplicationException.UserHasOrdersException.class);
+
+        verify(userRepository, never()).delete(any());
+        verify(messageRepository, never()).deleteBySenderId(anyLong());
     }
 
     @Test

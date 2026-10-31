@@ -1,5 +1,6 @@
 package pl.lukbol.dyplom.DTOs.order;
 
+import pl.lukbol.dyplom.common.Messages;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
@@ -10,38 +11,38 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 public record AddOrderDTO(
-        @NotBlank(message = "Opis zlecenia jest wymagany.")
+        @NotBlank(message = Messages.ORDER_DESCRIPTION_REQUIRED)
         String description,
 
-        @NotBlank(message = "Nazwa klienta jest wymagana.")
+        @NotBlank(message = Messages.ORDER_CLIENT_REQUIRED)
         String clientName,
 
-        @NotBlank(message = "Adres email klienta jest wymagany.")
-        @Email(message = "Nieprawidłowy format adresu email.")
+        @NotBlank(message = Messages.ORDER_EMAIL_REQUIRED)
+        @Email(message = Messages.ORDER_EMAIL_INVALID)
         String email,
 
-        @NotBlank(message = "Numer telefonu jest wymagany.")
+        @NotBlank(message = Messages.ORDER_PHONE_REQUIRED)
         String phoneNumber,
 
-        @DecimalMin(value = "0.5", message = "Czas realizacji musi wynosić co najmniej 0.5 godziny.")
-        @DecimalMax(value = "8.0", message = "Czas realizacji nie może przekraczać 8 godzin.")
+        @DecimalMin(value = "0.5", message = Messages.ORDER_DURATION_MIN)
+        @DecimalMax(value = "8.0", message = Messages.ORDER_DURATION_MAX)
         double hours,
 
-        @NotBlank(message = "Data rozpoczęcia jest wymagana.")
+        @NotBlank(message = Messages.ORDER_START_REQUIRED)
         String startDate,
 
-        @NotBlank(message = "Data zakończenia jest wymagana.")
+        @NotBlank(message = Messages.ORDER_END_REQUIRED)
         String endDate,
 
-        @NotBlank(message = "Pracownik jest wymagany.")
+        @NotBlank(message = Messages.ORDER_EMPLOYEE_REQUIRED)
         String selectedUser,
 
-        @Min(value = 0, message = "Cena nie może być ujemna.")
+        @Min(value = 0, message = Messages.ORDER_PRICE_NONNEGATIVE)
         int price,
 
-        @NotBlank(message = "Status zlecenia jest wymagany.")
+        @NotBlank(message = Messages.ORDER_STATUS_REQUIRED)
         String status,
 
-        @NotNull(message = "Lista materiałów jest wymagana.")
+        @NotNull(message = Messages.ORDER_ITEMS_REQUIRED)
         List<String> items
 ) {}

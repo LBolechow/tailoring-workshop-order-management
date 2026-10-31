@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import pl.lukbol.dyplom.DTOs.order.OrderDetailsDTO;
+import pl.lukbol.dyplom.DTOs.order.BookingInterval;
 import pl.lukbol.dyplom.common.Messages;
 import pl.lukbol.dyplom.common.UserRole;
 import pl.lukbol.dyplom.DTOs.material.MaterialDTO;
@@ -37,106 +38,105 @@ public class OrderUtils {
     private final MaterialRepository materialRepository;
 
     public boolean isWorkingDay(Calendar calendar) {
-        int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
-        return dayOfWeek != Calendar.SATURDAY && dayOfWeek != Calendar.SUNDAY;
+        return schedulingPlanner.isWorkingDay(calendar);
     }
 
-    public List<User> findAvailableUsersWithEndDateTime(Date taskStartDateTime, Date taskEndDateTime, int durationMinutes) {
-        if (taskStartDateTime == null || taskEndDateTime == null) {
+    private static final List<String> SCHEDULABLE_ROLES = List.of(
+            UserRole.EMPLOYEE.authority(), UserRole.ADMIN.authority());
+
+    /**
+     * Build a read-only snapshot for a complete 30-day slot search.
+     * Instead of fetching employees and their orders for every 30-minute
+     * candidate, load eligible employees once and their intervals once.
+     *
+     * This is only a preview. Writes must still use BookingSlotService's
+     * transactional lock-and-recheck to prevent stale preview races.
+     */
+    public BiFunction<Calendar, Calendar, List<User>> prepareAvailabilityLookup(
+            Date requestedStart, Long onlyEmployeeId, Long excludedEmployeeId) {
+        if (requestedStart == null) {
             throw new IllegalArgumentException(Messages.NULL_DATE_EXCEPTION);
         }
+        Date now = new Date();
+        Date from = requestedStart.after(now) ? requestedStart : now;
+        Calendar horizonEnd = Calendar.getInstance(TimeZone.getTimeZone(WARSAW_ZONE));
+        horizonEnd.setTime(from);
+        // findNextAvailableSlot inspects at most 30 days; leave a margin for
+        // rounding and weekends, including a DST boundary in Warsaw.
+        horizonEnd.add(Calendar.DAY_OF_MONTH, 32);
+        AvailabilitySnapshot snapshot = loadAvailabilitySnapshot(
+                from, horizonEnd.getTime(), onlyEmployeeId, excludedEmployeeId);
+        return (start, end) -> snapshot.available(start.getTime(), end.getTime());
+    }
 
-        List<String> roleNamesToSearch = List.of(UserRole.EMPLOYEE.authority(), UserRole.ADMIN.authority());
-        List<User> availableUsers = new ArrayList<>();
-
-        for (User user : userRepository.findAll()) {
-            if (user.getRole() == null || !roleNamesToSearch.contains(user.getRole().getName())) {
-                continue;
-            }
-
-            List<Order> userOrders = orderRepository
-                    .findByEmployeeNameAndEndDateAfterAndStartDateBefore(
-                            user.getName(), taskStartDateTime, taskEndDateTime
-                    );
-
-            boolean isAvailable = userOrders.stream().noneMatch(order ->
-                    hasTimeOverlap(taskStartDateTime, taskEndDateTime, order.getStartDate(), order.getEndDate())
-            );
-
-            if (isAvailable) {
-                availableUsers.add(user);
-            }
-        }
-
-        return availableUsers;
+    /** Single-slot compatibility API; only two DB queries, not N+1. */
+    public List<User> findAvailableUsersWithEndDateTime(Date taskStartDateTime, Date taskEndDateTime, int durationMinutes) {
+        validateDates(taskStartDateTime, taskEndDateTime);
+        return loadAvailabilitySnapshot(taskStartDateTime, taskEndDateTime, null, null)
+                .available(taskStartDateTime, taskEndDateTime);
     }
 
     public List<User> findAvailableUserWithEndDateTime(Long employeeId, Date taskStartDateTime, Date taskEndDateTime, int durationMinutes) {
-        if (taskStartDateTime == null || taskEndDateTime == null) {
-            throw new IllegalArgumentException(Messages.NULL_DATE_EXCEPTION);
-        }
-
-        List<String> roleNamesToSearch = List.of(UserRole.EMPLOYEE.authority(), UserRole.ADMIN.authority());
-        List<User> availableUsers = new ArrayList<>();
-
-        userRepository.findById(employeeId).ifPresent(user -> {
-            if (user.getRole() != null && roleNamesToSearch.contains(user.getRole().getName())) {
-                List<Order> userOrders = orderRepository
-                        .findByEmployeeNameAndEndDateAfterAndStartDateBefore(
-                                user.getName(), taskStartDateTime, taskEndDateTime
-                        );
-
-                boolean isAvailable = userOrders.stream().noneMatch(order ->
-                        hasTimeOverlap(taskStartDateTime, taskEndDateTime, order.getStartDate(), order.getEndDate())
-                );
-
-                if (isAvailable) {
-                    availableUsers.add(user);
-                }
-            }
-        });
-
-        return availableUsers;
+        validateDates(taskStartDateTime, taskEndDateTime);
+        return loadAvailabilitySnapshot(taskStartDateTime, taskEndDateTime, employeeId, null)
+                .available(taskStartDateTime, taskEndDateTime);
     }
 
     public List<User> findAvailableUsersWithoutEmployee(Long orderId, Date taskStartDateTime, Date taskEndDateTime, int durationMinutes) {
-        if (taskStartDateTime == null || taskEndDateTime == null) {
-            throw new IllegalArgumentException(Messages.NULL_DATE_EXCEPTION);
-        }
-
-        List<String> roleNamesToSearch = List.of(UserRole.EMPLOYEE.authority(), UserRole.ADMIN.authority());
-        List<User> availableUsers = new ArrayList<>();
-
-        orderRepository.findById(orderId).ifPresent(order -> {
-            String employeeNameOnOrder = order.getEmployeeName();
-            List<User> allUsersExceptEmployee = userRepository.findAllByNameNot(employeeNameOnOrder);
-
-            for (User user : allUsersExceptEmployee) {
-                if (user.getRole() == null || !roleNamesToSearch.contains(user.getRole().getName())) {
-                    continue;
-                }
-
-                List<Order> userOrders = orderRepository.findByEmployeeNameAndEndDateAfterAndStartDateBefore(
-                        user.getName(), taskStartDateTime, taskEndDateTime
-                );
-
-                boolean isAvailable = userOrders.stream().noneMatch(userOrder ->
-                        hasTimeOverlap(taskStartDateTime, taskEndDateTime, userOrder.getStartDate(), userOrder.getEndDate())
-                );
-
-                if (isAvailable) {
-                    availableUsers.add(user);
-                }
-            }
-        });
-
-        return availableUsers;
+        validateDates(taskStartDateTime, taskEndDateTime);
+        return orderRepository.findById(orderId)
+                .map(order -> loadAvailabilitySnapshot(
+                        taskStartDateTime, taskEndDateTime, null, order.getEmployee().getId())
+                        .available(taskStartDateTime, taskEndDateTime))
+                .orElseGet(List::of);
     }
 
-    private boolean hasTimeOverlap(Date start1, Date end1, Date start2, Date end2) {
-        return (end1.after(start2) && end1.before(end2)) ||
-                (start1.after(start2) && start1.before(end2)) ||
-                (start1.before(start2) && end1.after(end2));
+    private void validateDates(Date start, Date end) {
+        if (start == null || end == null) {
+            throw new IllegalArgumentException(Messages.NULL_DATE_EXCEPTION);
+        }
+    }
+
+    private AvailabilitySnapshot loadAvailabilitySnapshot(Date from, Date to,
+                                                           Long onlyEmployeeId, Long excludedEmployeeId) {
+        List<User> staff = userRepository.findUsersByRole_NameIn(SCHEDULABLE_ROLES).stream()
+                .filter(user -> user.getId() != null && user.getRole() != null
+                        && SCHEDULABLE_ROLES.contains(user.getRole().getName()))
+                .filter(user -> onlyEmployeeId == null || onlyEmployeeId.equals(user.getId()))
+                .filter(user -> excludedEmployeeId == null || !excludedEmployeeId.equals(user.getId()))
+                .sorted(Comparator.comparing(User::getId))
+                .toList();
+
+        if (staff.isEmpty()) {
+            return new AvailabilitySnapshot(staff, Map.of());
+        }
+
+        List<Long> ids = staff.stream().map(User::getId).toList();
+        List<BookingInterval> intervals = orderRepository.findBookedIntervalsForEmployees(ids, from, to);
+        Map<Long, List<BookingInterval>> byEmployee = intervals.stream()
+                .collect(Collectors.groupingBy(BookingInterval::employeeId));
+        byEmployee.values().forEach(list -> list.sort(Comparator.comparing(BookingInterval::startDate)));
+        return new AvailabilitySnapshot(staff, byEmployee);
+    }
+
+    private record AvailabilitySnapshot(List<User> staff, Map<Long, List<BookingInterval>> byEmployee) {
+        List<User> available(Date start, Date end) {
+            return staff.stream().filter(user -> isFree(user.getId(), start, end)).toList();
+        }
+
+        private boolean isFree(Long employeeId, Date start, Date end) {
+            // Sorted by start time; intervals beginning after the candidate ends
+            // cannot collide, so there is no need to inspect the rest.
+            for (BookingInterval slot : byEmployee.getOrDefault(employeeId, List.of())) {
+                if (!slot.startDate().before(end)) {
+                    break;
+                }
+                if (slot.endDate().after(start)) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     public boolean isAdmin(Authentication authentication) {
@@ -146,39 +146,43 @@ public class OrderUtils {
 
     public DateRange convertToDateRange(LocalDate fromDate, LocalDate toDate) {
         return new DateRange(
-                Date.from(LocalDateTime.of(fromDate, LocalTime.MIN).atZone(ZoneId.systemDefault()).toInstant()),
-                Date.from(LocalDateTime.of(toDate, LocalTime.MAX).atZone(ZoneId.systemDefault()).toInstant())
+                Date.from(LocalDateTime.of(fromDate, LocalTime.MIN).atZone(WARSAW_ZONE).toInstant()),
+                Date.from(LocalDateTime.of(toDate, LocalTime.MAX).atZone(WARSAW_ZONE).toInstant())
         );
     }
 
     public List<Order> filterInProgressOrders(List<Order> orders) {
         return orders.stream()
-                .filter(order -> Messages.ORDER_STATUS_IN_PROGRESS.equals(order.getStatus()))
+                .filter(order -> pl.lukbol.dyplom.common.OrderStatus.IN_PROGRESS == order.getOrderStatus())
                 .collect(Collectors.toList());
     }
 
     public User findUserByName(String name) {
-        List<User> users = userRepository.findByNameContainingIgnoreCase(name);
+        if (name == null || name.isBlank()) {
+            throw new ApplicationException.UserNotFoundException(Messages.USER_NOT_FOUND_BY_NAME + name);
+        }
+        List<User> users = userRepository.findByNameIgnoreCase(name.trim());
         if (users.isEmpty()) {
             throw new ApplicationException.UserNotFoundException(Messages.USER_NOT_FOUND_BY_NAME + name);
+        }
+        if (users.size() > 1) {
+            throw new ApplicationException.AmbiguousEmployeeException(
+                    Messages.AMBIGUOUS_EMPLOYEE + name + ". Użyj unikalnego identyfikatora.");
         }
         return users.get(0);
     }
 
-    public void updateOrderFields(Order order, EditOrderDTO request) {
-        User user = findUserByName(request.selectedUser());
-        order.setEmployeeName(user.getName());
+    public void updateOrderFields(Order order, EditOrderDTO request,
+                                  User selectedEmployee, DateRange dates) {
+        // Reuse the employee and range validated by BookingSlotService.
+        order.setEmployee(selectedEmployee);
         order.setDescription(request.description());
         order.setClientName(request.clientName());
         order.setClientEmail(request.email());
         order.setPhoneNumber(request.phoneNumber());
 
-        try {
-            order.setStartDate(DateUtils.parseDate(request.startDate(), "yyyy-MM-dd"));
-            order.setEndDate(DateUtils.parseDate(request.endDate(), "yyyy-MM-dd"));
-        } catch (ParseException e) {
-            throw new ApplicationException.InvalidDateException(Messages.INVALID_DATE_FORMAT + e.getMessage());
-        }
+        order.setStartDate(dates.start());
+        order.setEndDate(dates.end());
 
         order.setDuration(request.hours());
         order.setPrice(request.price());
@@ -187,7 +191,7 @@ public class OrderUtils {
 
     public void addNotificationAboutNewOrder(User user) {
         List<Notification> notifications = new ArrayList<>(user.getNotifications());
-        notifications.add(new Notification(Messages.NEW_ORDER_NOTIF, new Date(), user, "System"));
+        notifications.add(new Notification(Messages.NEW_ORDER_NOTIF, new Date(), user, Messages.SYSTEM_NOTIFICATION_CREATOR));
         user.setNotifications(notifications);
         userRepository.save(user);
     }
@@ -202,126 +206,21 @@ public class OrderUtils {
         return orderRepository.findByEndDateBetween(dateRange.start(), dateRange.end());
     }
 
-    public List<Order> findOrdersForUser(String username, DateRange dateRange) {
-        return orderRepository.findByEmployeeNameAndEndDateBetween(username, dateRange.start(), dateRange.end());
+    public List<Order> findOrdersForUser(Long employeeId, DateRange dateRange) {
+        return orderRepository.findByEmployeeIdAndEndDateBetween(employeeId, dateRange.start(), dateRange.end());
     }
 
-    public OrderDTO toOrderDTO(Order order) {
-        return new OrderDTO(
-                order.getId(),
-                order.getDescription(),
-                order.getClientName(),
-                order.getClientEmail(),
-                order.getPhoneNumber(),
-                order.getDuration(),
-                order.getStartDate().toString(),
-                order.getEndDate().toString(),
-                order.getEmployeeName(),
-                order.getPrice(),
-                order.getStatus(),
-                order.getMaterials().stream()
-                        .map(m -> new MaterialDTO(m.getId(), m.getItem(), m.isChecked()))
-                        .toList()
-        );
-    }
+    private final pl.lukbol.dyplom.services.OrderMapper orderMapper = new pl.lukbol.dyplom.services.OrderMapper();
 
-    public OrderDetailsDTO buildOrderDetailsDTO(Order order) {
-        List<MaterialDTO> materials = order.getMaterials().stream()
-                .map(m -> new MaterialDTO(m.getId(), m.getItem(), m.isChecked()))
-                .toList();
+    public OrderDTO toOrderDTO(Order order) { return orderMapper.toOrderDTO(order); }
+    public OrderDetailsDTO buildOrderDetailsDTO(Order order) { return orderMapper.buildOrderDetailsDTO(order); }
 
-        return new OrderDetailsDTO(
-                order.getId(),
-                order.getDescription(),
-                order.getClientName(),
-                order.getClientEmail(),
-                order.getPhoneNumber(),
-                order.getEmployeeName(),
-                order.getStatus(),
-                order.getPrice(),
-                order.getDuration(),
-                order.getIdCode(),
-                materials
-        );
-    }
+    private final pl.lukbol.dyplom.services.SchedulingPlanner schedulingPlanner =
+            new pl.lukbol.dyplom.services.SchedulingPlanner();
 
-
-    public AvailabilityDTO findNextAvailableSlot(
-            Date startDate,
-            double durationHours,
+    public AvailabilityDTO findNextAvailableSlot(Date startDate, double durationHours,
             BiFunction<Calendar, Calendar, List<User>> availableUsersProvider) {
-
-        final int WORKDAY_END_HOUR = 16;
-        final int START_HOUR = 8;
-        final int MAX_DAYS_LOOKAHEAD = 30;
-        int daysChecked = 0;
-
-        Calendar currentDateTime = Calendar.getInstance();
-        currentDateTime.setTime(startDate);
-        Calendar now = Calendar.getInstance();
-        if (currentDateTime.before(now)) {
-            currentDateTime = now;
-        }
-
-        if (currentDateTime.get(Calendar.HOUR_OF_DAY) >= WORKDAY_END_HOUR) {
-            advanceToNextDayStart(currentDateTime, START_HOUR);
-        } else if (currentDateTime.get(Calendar.HOUR_OF_DAY) < START_HOUR) {
-            currentDateTime.set(Calendar.HOUR_OF_DAY, START_HOUR);
-            currentDateTime.set(Calendar.MINUTE, 0);
-            currentDateTime.set(Calendar.SECOND, 0);
-            currentDateTime.set(Calendar.MILLISECOND, 0);
-        }
-
-        while (daysChecked < MAX_DAYS_LOOKAHEAD) {
-            if (isWorkingDay(currentDateTime)) {
-                Calendar endDateTime = (Calendar) currentDateTime.clone();
-                int durationMinutes = (int) (durationHours * 60);
-                endDateTime.add(Calendar.MINUTE, durationMinutes);
-
-                Calendar workdayEnd = (Calendar) currentDateTime.clone();
-                workdayEnd.set(Calendar.HOUR_OF_DAY, WORKDAY_END_HOUR);
-                workdayEnd.set(Calendar.MINUTE, 0);
-                workdayEnd.set(Calendar.SECOND, 0);
-                workdayEnd.set(Calendar.MILLISECOND, 0);
-
-                if (endDateTime.after(workdayEnd)) {
-                    advanceToNextDayStart(currentDateTime, START_HOUR);
-                    daysChecked++;
-                    continue;
-                }
-
-                List<User> availableUsers = availableUsersProvider.apply(currentDateTime, endDateTime);
-
-                if (!availableUsers.isEmpty()) {
-                    return new AvailabilityDTO(
-                            true,
-                            Messages.SLOT_AVAILABLE,
-                            DateUtils.formatDateTime(currentDateTime),
-                            DateUtils.formatDateTime(endDateTime),
-                            availableUsers.get(0).getName()
-                    );
-                }
-            }
-
-            advanceToNextDayStart(currentDateTime, START_HOUR);
-            daysChecked++;
-        }
-
-        return new AvailabilityDTO(
-                false,
-                Messages.NO_AVAILABLE_EMPLOYEES,
-                null,
-                null,
-                null
-        );
-    }
-
-    private void advanceToNextDayStart(Calendar calendar, int startHour) {
-        calendar.add(Calendar.DAY_OF_MONTH, 1);
-        calendar.set(Calendar.HOUR_OF_DAY, startHour);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        calendar.set(Calendar.MILLISECOND, 0);
+        return schedulingPlanner.findNextAvailableSlot(startDate, durationHours, availableUsersProvider);
     }
 
     public void updateOrderMaterials(Order order, List<String> items) {

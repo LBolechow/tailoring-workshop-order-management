@@ -22,6 +22,7 @@ import pl.lukbol.dyplom.repositories.MaterialRepository;
 import pl.lukbol.dyplom.repositories.OrderRepository;
 import pl.lukbol.dyplom.repositories.UserRepository;
 import pl.lukbol.dyplom.services.OrderService;
+import pl.lukbol.dyplom.services.BookingSlotService;
 import pl.lukbol.dyplom.utilities.OrderUtils;
 
 import java.time.LocalDate;
@@ -52,6 +53,9 @@ class OrderServiceTest {
     private OrderUtils orderUtils;
 
     @Mock
+    private BookingSlotService bookingSlotService;
+
+    @Mock
     private Authentication authentication;
 
     @Mock
@@ -77,7 +81,7 @@ class OrderServiceTest {
                 "Klient Test",
                 "klient@test.pl",
                 "123456789",
-                "Jan Kowalski",
+                user,
                 new Date(),
                 new Date(),
                 "W trakcie",
@@ -104,7 +108,7 @@ class OrderServiceTest {
     void addOrder_shouldSaveOrderAndReturnSuccessMessage() {
         AddOrderDTO dto = new AddOrderDTO(
                 "Opis", "Klient", "klient@test.pl", "123456789",
-                2.0, "2024-01-15", "2024-01-16", "Jan Kowalski", 100, "W trakcie",
+                2.0, "2026-11-02T09:00:00", "2026-11-02T11:00:00", "Jan Kowalski", 100, "W trakcie",
                 List.of("Materiał 1", "Materiał 2")
         );
         when(orderUtils.findUserByName("Jan Kowalski")).thenReturn(user);
@@ -112,6 +116,7 @@ class OrderServiceTest {
 
         ApiResponseDTO result = orderService.addOrder(dto);
 
+        verify(bookingSlotService).lockAndCheckSlot(eq(1L), any(), any(), isNull());
         verify(orderUtils).addNotificationAboutNewOrder(user);
         verify(orderRepository).save(any(Order.class));
         assertThat(result.message()).isEqualTo(Messages.NEW_ORDER_NOTIF);
@@ -138,12 +143,12 @@ class OrderServiceTest {
     void getUserOrders_shouldReturnSortedOrders() {
         Order olderOrder = new Order(
                 "Starsze", "Klient", "klient@test.pl", "123",
-                "Jan Kowalski", new Date(1000), new Date(1000),
+                user, new Date(1000), new Date(1000),
                 "W trakcie", 50, 1.0, new ArrayList<>(), "CODE-1"
         );
         Order newerOrder = new Order(
                 "Nowsze", "Klient", "klient@test.pl", "123",
-                "Jan Kowalski", new Date(9000), new Date(9000),
+                user, new Date(9000), new Date(9000),
                 "W trakcie", 50, 1.0, new ArrayList<>(), "CODE-2"
         );
 
@@ -202,14 +207,16 @@ class OrderServiceTest {
     void editOrder_shouldUpdateOrderAndReturnSuccessMessage() {
         EditOrderDTO dto = new EditOrderDTO(
                 "Nowy opis", "Nowy klient", "nowy@test.pl", "987654321",
-                3.0, "2024-02-01", "2024-02-02", "Jan Kowalski", 200, "Zakończone",
+                3.0, "2026-11-03T09:00:00", "2026-11-03T12:00:00", "Jan Kowalski", 200, "Zakończone",
                 List.of("Nowy materiał")
         );
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
+        when(orderUtils.findUserByName("Jan Kowalski")).thenReturn(user);
 
         ApiResponseDTO result = orderService.editOrder(1L, dto);
 
-        verify(orderUtils).updateOrderFields(order, dto);
+        verify(bookingSlotService).lockAndCheckSlot(eq(1L), any(), any(), eq(1L));
+        verify(orderUtils).updateOrderFields(eq(order), eq(dto), eq(user), any());
         verify(orderUtils).updateOrderMaterials(order, dto.items());
         verify(orderRepository).save(order);
         assertThat(result.message()).isEqualTo(Messages.ORDER_UPDATED_NOTIF);
@@ -219,10 +226,10 @@ class OrderServiceTest {
     void editOrder_shouldThrowOrderNotFoundException_whenOrderNotFound() {
         EditOrderDTO dto = new EditOrderDTO(
                 "Opis", "Klient", "klient@test.pl", "123",
-                2.0, "2024-01-15", "2024-01-16", "Jan Kowalski", 100, "W trakcie",
+                2.0, "2026-11-02T09:00:00", "2026-11-02T11:00:00", "Jan Kowalski", 100, "W trakcie",
                 List.of()
         );
-        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.editOrder(99L, dto))
                 .isInstanceOf(ApplicationException.OrderNotFoundException.class)
@@ -235,7 +242,7 @@ class OrderServiceTest {
 
     @Test
     void deleteOrder_shouldDeleteOrderWithMaterialsAndReturnSuccessMessage() {
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
 
         ApiResponseDTO result = orderService.deleteOrder(1L);
 
@@ -247,7 +254,7 @@ class OrderServiceTest {
     @Test
     void deleteOrder_shouldDeleteOrderWithoutCallingMaterialDelete_whenNoMaterials() {
         order.setMaterials(null);
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
 
         ApiResponseDTO result = orderService.deleteOrder(1L);
 
@@ -258,7 +265,7 @@ class OrderServiceTest {
 
     @Test
     void deleteOrder_shouldThrowOrderNotFoundException_whenOrderNotFound() {
-        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.deleteOrder(99L))
                 .isInstanceOf(ApplicationException.OrderNotFoundException.class)
@@ -328,7 +335,7 @@ class OrderServiceTest {
         OrderRequestByDateDTO requestDTO = new OrderRequestByDateDTO(null, null);
         List<OrderDTO> result = orderService.getDailyOrders(authentication, requestDTO);
 
-        verify(orderUtils).findOrdersForUser(eq("Jan Kowalski"), any());
+        verify(orderUtils).findOrdersForUser(eq(1L), any());
         verify(orderUtils, never()).findOrdersForAdmin(any());
         assertThat(result).hasSize(1);
     }
@@ -357,4 +364,40 @@ class OrderServiceTest {
         assertThat(result).hasSize(1);
         verify(orderRepository).findByStartDateBetweenWithMaterials(any(), any());
     }
+
+    @Test
+    void addOrder_shouldPersistSuppliedHoursInsteadOfMidnight() {
+        AddOrderDTO dto = new AddOrderDTO(
+                "Opis", "Klient", "klient@test.pl", "123456789",
+                1.5, "2026-11-02T09:30:00", "2026-11-02T11:00:00",
+                "Jan Kowalski", 100, "W trakcie", List.of()
+        );
+        when(orderUtils.findUserByName("Jan Kowalski")).thenReturn(user);
+        when(orderUtils.createMaterialsForOrder(any(), any())).thenReturn(List.of());
+
+        orderService.addOrder(dto);
+
+        org.mockito.ArgumentCaptor<Order> captor =
+                org.mockito.ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(pl.lukbol.dyplom.utilities.DateUtils.formatOrderDateTime(
+                captor.getValue().getStartDate())).isEqualTo("2026-11-02T09:30:00");
+        assertThat(pl.lukbol.dyplom.utilities.DateUtils.formatOrderDateTime(
+                captor.getValue().getEndDate())).isEqualTo("2026-11-02T11:00:00");
+    }
+
+    @Test
+    void addOrder_shouldRejectEndBeforeStart() {
+        AddOrderDTO dto = new AddOrderDTO(
+                "Opis", "Klient", "klient@test.pl", "123456789",
+                1.0, "2026-11-02T11:00:00", "2026-11-02T10:00:00",
+                "Jan Kowalski", 100, "W trakcie", List.of()
+        );
+        when(orderUtils.findUserByName("Jan Kowalski")).thenReturn(user);
+
+        assertThatThrownBy(() -> orderService.addOrder(dto))
+                .isInstanceOf(ApplicationException.InvalidDateException.class);
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
 }

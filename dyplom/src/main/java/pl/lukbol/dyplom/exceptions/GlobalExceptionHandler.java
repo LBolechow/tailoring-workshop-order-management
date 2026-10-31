@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pl.lukbol.dyplom.DTOs.exception.ErrorMessageDTO;
+import pl.lukbol.dyplom.common.Messages;
 
 import java.util.stream.Collectors;
 
@@ -30,7 +31,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorMessageDTO> handleDatabaseException(DataAccessException ex) {
         log.error("Blad dostepu do bazy danych: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorMessageDTO(ERROR_MSG, "Database error: " + ex.getMessage()));
+                .body(new ErrorMessageDTO(ERROR_MSG, Messages.INTERNAL_SERVER_ERROR));
     }
 
     @ExceptionHandler(ApplicationException.UserWithEmailAlreadyExistsException.class)
@@ -69,6 +70,35 @@ public class GlobalExceptionHandler {
                 .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
     }
 
+    @ExceptionHandler(ApplicationException.OrderSlotConflictException.class)
+    public ResponseEntity<ErrorMessageDTO> handleOrderSlotConflict(
+            ApplicationException.OrderSlotConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
+    }
+
+    @ExceptionHandler(ApplicationException.UserHasOrdersException.class)
+    public ResponseEntity<ErrorMessageDTO> handleEmployeeWithOrders(ApplicationException.UserHasOrdersException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
+    }
+
+    @ExceptionHandler(ApplicationException.AmbiguousEmployeeException.class)
+    public ResponseEntity<ErrorMessageDTO> handleAmbiguousEmployee(ApplicationException.AmbiguousEmployeeException ex) {
+        return ResponseEntity.badRequest()
+                .body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
+    }
+
+    @ExceptionHandler(ApplicationException.InvalidOrderStatusException.class)
+    public ResponseEntity<ErrorMessageDTO> handleInvalidOrderStatus(ApplicationException.InvalidOrderStatusException ex) {
+        return ResponseEntity.badRequest().body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
+    }
+
+    @ExceptionHandler(ApplicationException.OrderAccessDeniedException.class)
+    public ResponseEntity<ErrorMessageDTO> handleOrderAccessDenied(ApplicationException.OrderAccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorMessageDTO(ERROR_MSG, ex.getMessage()));
+    }
+
     @ExceptionHandler(ApplicationException.InvalidDateException.class)
     public ResponseEntity<ErrorMessageDTO> handleInvalidDate(ApplicationException.InvalidDateException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -101,7 +131,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorMessageDTO(
                         ERROR_MSG,
-                        "An unexpected server error occurred"
+                        Messages.INTERNAL_SERVER_ERROR
                 ));
     }
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -118,7 +148,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ErrorMessageDTO(
                         ERROR_MSG,
-                        "Invalid or expired authorization code"
+                        Messages.INVALID_OAUTH2_CODE
                 ));
     }
     @ExceptionHandler(
@@ -129,7 +159,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorMessageDTO(
                         ERROR_MSG,
-                        "Invalid or expired password reset token"
+                        Messages.INVALID_RESET_TOKEN
                 ));
     }
 

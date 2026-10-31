@@ -1,6 +1,6 @@
 package pl.lukbol.dyplom.services;
 
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -23,13 +23,7 @@ import pl.lukbol.dyplom.utilities.AuthenticationUtils;
 import pl.lukbol.dyplom.utilities.DateUtils;
 import pl.lukbol.dyplom.utilities.OrderUtils;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.*;
 
 import static pl.lukbol.dyplom.utilities.OrderUtils.WARSAW_ZONE;
@@ -43,30 +37,30 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final MaterialRepository materialRepository;
     private final OrderUtils orderUtils;
+    private final BookingSlotService bookingSlotService;
+    private final BookingPolicy bookingPolicy = new BookingPolicy();
 
     public CurrentDateDTO getCurrentDate() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-        return new CurrentDateDTO(sdf.format(new Date()));
+        return new CurrentDateDTO(LocalDate.now(WARSAW_ZONE).toString());
     }
 
     @Transactional
     public ApiResponseDTO addOrder(AddOrderDTO request) {
         User user = orderUtils.findUserByName(request.selectedUser());
-        Date startDate;
-        Date endDate;
-        try {
-            startDate = DateUtils.parseDate(request.startDate(), "yyyy-MM-dd");
-            endDate = DateUtils.parseDate(request.endDate(), "yyyy-MM-dd");
-        } catch (ParseException e) {
-            throw new ApplicationException.InvalidDateException("Nieprawidłowy format daty: " + e.getMessage());
-        }
+        DateRange dates = DateUtils.parseOrderRange(request.startDate(), request.endDate());
+        Date startDate = dates.start();
+        Date endDate = dates.end();
+        bookingPolicy.validateDuration(startDate, endDate, request.hours());
+
+        // The availability preview is advisory; check again under a DB row lock.
+        bookingSlotService.lockAndCheckSlot(user.getId(), startDate, endDate, null);
 
         Order newOrder = new Order(
                 request.description(),
                 request.clientName(),
                 request.email(),
                 request.phoneNumber(),
-                request.selectedUser(),
+                user,
                 startDate,
                 endDate,
                 request.status(),
@@ -86,6 +80,7 @@ public class OrderService {
         return new ApiResponseDTO(Messages.NEW_ORDER_NOTIF);
     }
 
+    @Transactional(readOnly = true)
     public List<OrderDTO> getDailyOrders(Authentication authentication, OrderRequestByDateDTO orderRequestDTO) {
         String userEmail = AuthenticationUtils.checkmail(authentication.getPrincipal());
         boolean isAdmin = authentication.getAuthorities().stream()
@@ -96,13 +91,14 @@ public class OrderService {
 
         List<Order> orders = isAdmin
                 ? orderUtils.findOrdersForAdmin(dateRange)
-                : orderUtils.findOrdersForUser(user.getName(), dateRange);
+                : orderUtils.findOrdersForUser(user.getId(), dateRange);
 
         return orders.stream()
                 .map(orderUtils::toOrderDTO)
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<OrderDTO> getUserOrders(String userEmail) {
         User user = userRepository.findByEmail(userEmail);
         if (user == null) {
@@ -116,6 +112,7 @@ public class OrderService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public OrderDetailsDTO getOrderDetails(Long id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ApplicationException.OrderNotFoundException(Messages.ORDER_NOT_FOUND));
@@ -124,71 +121,61 @@ public class OrderService {
 
     @Transactional
     public ApiResponseDTO editOrder(Long id, EditOrderDTO request) {
-        Order order = orderRepository.findById(id)
+        Order order = orderRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ApplicationException.OrderNotFoundException(Messages.ORDER_NOT_FOUND));
 
-        orderUtils.updateOrderFields(order, request);
+        // Lock the destination employee, then validate the NEW interval,
+        // excluding only this order's current booking.
+        User selectedEmployee = orderUtils.findUserByName(request.selectedUser());
+        DateRange range = DateUtils.parseOrderRange(request.startDate(), request.endDate());
+        bookingPolicy.validateDuration(range.start(), range.end(), request.hours());
+        bookingSlotService.lockAndCheckSlot(selectedEmployee.getId(), range.start(), range.end(), id);
+
+        orderUtils.updateOrderFields(order, request, selectedEmployee, range);
         orderUtils.updateOrderMaterials(order, request.items());
         orderRepository.save(order);
 
         return new ApiResponseDTO(Messages.ORDER_UPDATED_NOTIF);
     }
 
+    @Transactional(readOnly = true)
     public AvailabilityDTO checkAvailability(double durationHours, int startHour) {
-        Calendar now = Calendar.getInstance();
+        Calendar now = Calendar.getInstance(TimeZone.getTimeZone(WARSAW_ZONE));
         now.set(Calendar.HOUR_OF_DAY, startHour);
         now.set(Calendar.MINUTE, 0);
         now.set(Calendar.SECOND, 0);
 
         return orderUtils.findNextAvailableSlot(
-                now.getTime(),
-                durationHours,
-                (current, end) -> orderUtils.findAvailableUsersWithEndDateTime(
-                        current.getTime(),
-                        end.getTime(),
-                        (int) (durationHours * 60)
-                )
+                now.getTime(), durationHours,
+                orderUtils.prepareAvailabilityLookup(now.getTime(), null, null)
         );
     }
 
+    @Transactional(readOnly = true)
     public AvailabilityDTO checkAvailabilityNextDay(Long orderId, double durationHours) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ApplicationException.OrderNotFoundException("Zamówienie nie znalezione"));
+                .orElseThrow(() -> new ApplicationException.OrderNotFoundException(Messages.ORDER_NOT_FOUND));
 
         return orderUtils.findNextAvailableSlot(
-                order.getEndDate(),
-                durationHours,
-                (current, end) -> {
-                    User user = userRepository.findByName(order.getEmployeeName());
-                    return orderUtils.findAvailableUserWithEndDateTime(
-                            user.getId(),
-                            current.getTime(),
-                            end.getTime(),
-                            (int) (durationHours * 60)
-                    );
-                }
+                order.getEndDate(), durationHours,
+                orderUtils.prepareAvailabilityLookup(order.getEndDate(), order.getEmployee().getId(), null)
         );
     }
 
+    @Transactional(readOnly = true)
     public AvailabilityDTO checkAvailabilityOtherEmployee(Long orderId, double durationHours) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ApplicationException.OrderNotFoundException("Zamówienie nie znalezione"));
+                .orElseThrow(() -> new ApplicationException.OrderNotFoundException(Messages.ORDER_NOT_FOUND));
 
         return orderUtils.findNextAvailableSlot(
-                order.getEndDate(),
-                durationHours,
-                (current, end) -> orderUtils.findAvailableUsersWithoutEmployee(
-                        order.getId(),
-                        current.getTime(),
-                        end.getTime(),
-                        (int) (durationHours * 60)
-                )
+                order.getEndDate(), durationHours,
+                orderUtils.prepareAvailabilityLookup(order.getEndDate(), null, order.getEmployee().getId())
         );
     }
 
     @Transactional
     public ApiResponseDTO deleteOrder(Long id) {
-        Order order = orderRepository.findById(id)
+        Order order = orderRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ApplicationException.OrderNotFoundException(Messages.ORDER_NOT_FOUND));
 
         if (order.getMaterials() != null) {
@@ -201,6 +188,7 @@ public class OrderService {
         return new ApiResponseDTO(Messages.ORDER_DELETED);
     }
 
+    @Transactional(readOnly = true)
     public List<OrderDTO> searchOrdersByStartDateBetweenWithMaterials(LocalDate fromDate, LocalDate toDate, Authentication authentication) {
         boolean isAdmin = orderUtils.isAdmin(authentication);
         DateRange dateRange = orderUtils.convertToDateRange(fromDate, toDate);
@@ -208,8 +196,8 @@ public class OrderService {
 
         List<Order> matchingOrders = isAdmin
                 ? orderRepository.findByStartDateBetweenWithMaterials(dateRange.start(), dateRange.end())
-                : orderRepository.findByEmployeeNameAndStartDateBetweenWithMaterials(
-                userRepository.findByEmail(userEmail).getName(),
+                : orderRepository.findByEmployeeIdAndStartDateBetweenWithMaterials(
+                userRepository.findByEmail(userEmail).getId(),
                 dateRange.start(),
                 dateRange.end()
         );
@@ -233,26 +221,6 @@ public class OrderService {
     }
 
     private DateRange parseDateRange(String start, String end) {
-        if (start == null || end == null) {
-            LocalDateTime now = LocalDateTime.now();
-            return new DateRange(
-                    Date.from(now.with(LocalTime.MIN).atZone(WARSAW_ZONE).toInstant()),
-                    Date.from(now.with(LocalTime.MAX).atZone(WARSAW_ZONE).toInstant())
-            );
-        }
-
-        try {
-            LocalDateTime startDateTime = LocalDateTime.parse(start, DateTimeFormatter.ISO_DATE_TIME);
-            LocalDateTime endDateTime = LocalDateTime.parse(end, DateTimeFormatter.ISO_DATE_TIME);
-            return new DateRange(
-                    Date.from(startDateTime.atZone(WARSAW_ZONE).toInstant()),
-                    Date.from(endDateTime.atZone(WARSAW_ZONE).toInstant())
-            );
-        } catch (DateTimeParseException e) {
-            return new DateRange(
-                    Date.from(LocalDate.parse(start).atStartOfDay(WARSAW_ZONE).toInstant()),
-                    Date.from(LocalDate.parse(end).atTime(23, 59, 59).atZone(WARSAW_ZONE).toInstant())
-            );
-        }
+        return DateUtils.parseSearchRange(start, end);
     }
 }

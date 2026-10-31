@@ -1,0 +1,24 @@
+# Lokalna baza PostgreSQL dla backendu Spring Boot.
+# Uruchomienie: docker compose up -d
+# Zatrzymanie: docker compose down  (dane pozostaja na wolumenie)
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: tailoring-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-tailoring_db}
+      POSTGRES_USER: ${DB_USER:-tailoring_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tailoring_local_dev_123}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - tailoring_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  tailoring_postgres_data:

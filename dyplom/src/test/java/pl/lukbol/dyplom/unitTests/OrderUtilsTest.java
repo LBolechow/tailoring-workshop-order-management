@@ -10,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import pl.lukbol.dyplom.DTOs.date.DateRange;
 import pl.lukbol.dyplom.DTOs.order.*;
+import pl.lukbol.dyplom.DTOs.order.BookingInterval;
 import pl.lukbol.dyplom.classes.Material;
 import pl.lukbol.dyplom.classes.Order;
 import pl.lukbol.dyplom.classes.Role;
@@ -76,7 +77,7 @@ class OrderUtilsTest {
 
         order = new Order(
                 "Opis zlecenia", "Klient", "klient@test.pl", "123456789",
-                "Anna Nowak", new Date(), new Date(),
+                employeeUser, new Date(), new Date(),
                 "W trakcie", 100, 2.0, new ArrayList<>(List.of(material)), "CODE-123"
         );
         order.setId(1L);
@@ -164,21 +165,31 @@ class OrderUtilsTest {
     // findUserByName
 
     @Test
-    void findUserByName_shouldReturnFirstMatchingUser() {
-        when(userRepository.findByNameContainingIgnoreCase("Anna")).thenReturn(List.of(employeeUser));
+    void findUserByName_shouldReturnExactCaseInsensitiveMatch() {
+        when(userRepository.findByNameIgnoreCase("Anna Nowak")).thenReturn(List.of(employeeUser));
 
-        User result = orderUtils.findUserByName("Anna");
+        User result = orderUtils.findUserByName("Anna Nowak");
 
         assertThat(result.getName()).isEqualTo("Anna Nowak");
     }
 
     @Test
     void findUserByName_shouldThrowUserNotFoundException_whenNoUserFound() {
-        when(userRepository.findByNameContainingIgnoreCase("Nieznany")).thenReturn(List.of());
+        when(userRepository.findByNameIgnoreCase("Nieznany")).thenReturn(List.of());
 
         assertThatThrownBy(() -> orderUtils.findUserByName("Nieznany"))
                 .isInstanceOf(ApplicationException.UserNotFoundException.class)
                 .hasMessageContaining(Messages.USER_NOT_FOUND_BY_NAME);
+    }
+
+    @Test
+    void findUserByName_shouldRejectAmbiguousDisplayName() {
+        User secondEmployee = new User("Anna Nowak", "anna2@test.pl", "hash", true);
+        when(userRepository.findByNameIgnoreCase("Anna Nowak"))
+                .thenReturn(List.of(employeeUser, secondEmployee));
+
+        assertThatThrownBy(() -> orderUtils.findUserByName("Anna Nowak"))
+                .isInstanceOf(ApplicationException.AmbiguousEmployeeException.class);
     }
 
     // createMaterialsForOrder
@@ -318,9 +329,9 @@ class OrderUtilsTest {
         Date start = new Date(1000);
         Date end = new Date(5000);
 
-        when(userRepository.findAll()).thenReturn(List.of(employeeUser));
-        when(orderRepository.findByEmployeeNameAndEndDateAfterAndStartDateBefore(
-                "Anna Nowak", start, end)).thenReturn(List.of());
+        when(userRepository.findUsersByRole_NameIn(anyCollection())).thenReturn(List.of(employeeUser));
+        when(orderRepository.findBookedIntervalsForEmployees(
+                List.of(1L), start, end)).thenReturn(List.of());
 
         List<User> result = orderUtils.findAvailableUsersWithEndDateTime(start, end, 60);
 
@@ -337,9 +348,10 @@ class OrderUtilsTest {
         overlappingOrder.setStartDate(new Date(1000));
         overlappingOrder.setEndDate(new Date(9000));
 
-        when(userRepository.findAll()).thenReturn(List.of(employeeUser));
-        when(orderRepository.findByEmployeeNameAndEndDateAfterAndStartDateBefore(
-                "Anna Nowak", taskStart, taskEnd)).thenReturn(List.of(overlappingOrder));
+        when(userRepository.findUsersByRole_NameIn(anyCollection())).thenReturn(List.of(employeeUser));
+        when(orderRepository.findBookedIntervalsForEmployees(
+                List.of(1L), taskStart, taskEnd)).thenReturn(List.of(
+                new BookingInterval(1L, overlappingOrder.getStartDate(), overlappingOrder.getEndDate())));
 
         List<User> result = orderUtils.findAvailableUsersWithEndDateTime(taskStart, taskEnd, 60);
 
@@ -351,12 +363,12 @@ class OrderUtilsTest {
         User userWithoutRole = new User("Bez roli", "bezroli@test.pl", "haslo", true);
         userWithoutRole.setRole(null);
 
-        when(userRepository.findAll()).thenReturn(List.of(userWithoutRole));
+        when(userRepository.findUsersByRole_NameIn(anyCollection())).thenReturn(List.of(userWithoutRole));
 
         List<User> result = orderUtils.findAvailableUsersWithEndDateTime(new Date(1000), new Date(5000), 60);
 
         assertThat(result).isEmpty();
-        verify(orderRepository, never()).findByEmployeeNameAndEndDateAfterAndStartDateBefore(any(), any(), any());
+        verify(orderRepository, never()).findBookedIntervalsForEmployees(anyList(), any(), any());
     }
 
     // findNextAvailableSlot
@@ -375,6 +387,58 @@ class OrderUtilsTest {
         assertThat(result.message()).isEqualTo(Messages.SLOT_AVAILABLE);
         assertThat(result.userName()).isEqualTo("Anna Nowak");
         assertThat(result.startDateTime()).startsWith(asDate(monday));
+        assertThat(result.startDateTime()).endsWith("08:00:00");
+        assertThat(result.endDateTime()).endsWith("10:00:00");
+    }
+
+    @Test
+    void findNextAvailableSlot_shouldSearchLaterTimesOnTheSameDay() {
+        Calendar monday = futureDayAt(Calendar.MONDAY, 8, 0);
+
+        AvailabilityDTO result = orderUtils.findNextAvailableSlot(
+                monday.getTime(),
+                1.0,
+                (start, end) -> start.get(Calendar.HOUR_OF_DAY) >= 9
+                        ? List.of(employeeUser)
+                        : List.of()
+        );
+
+        assertThat(result.available()).isTrue();
+        assertThat(result.startDateTime()).startsWith(asDate(monday));
+        assertThat(result.startDateTime()).endsWith("09:00:00");
+        assertThat(result.endDateTime()).endsWith("10:00:00");
+    }
+
+    @Test
+    void findNextAvailableSlot_shouldRoundStartTimeUpToTheNextHalfHour() {
+        Calendar monday = futureDayAt(Calendar.MONDAY, 8, 10);
+
+        AvailabilityDTO result = orderUtils.findNextAvailableSlot(
+                monday.getTime(),
+                1.0,
+                (start, end) -> List.of(employeeUser)
+        );
+
+        assertThat(result.available()).isTrue();
+        assertThat(result.startDateTime()).startsWith(asDate(monday));
+        assertThat(result.startDateTime()).endsWith("08:30:00");
+        assertThat(result.endDateTime()).endsWith("09:30:00");
+    }
+
+    @Test
+    void findNextAvailableSlot_shouldMoveToNextWorkingDayWhenNoSlotFits() {
+        Calendar monday = futureDayAt(Calendar.MONDAY, 15, 30);
+        Calendar expectedTuesday = (Calendar) monday.clone();
+        expectedTuesday.add(Calendar.DAY_OF_MONTH, 1);
+
+        AvailabilityDTO result = orderUtils.findNextAvailableSlot(
+                monday.getTime(),
+                2.0,
+                (start, end) -> List.of(employeeUser)
+        );
+
+        assertThat(result.available()).isTrue();
+        assertThat(result.startDateTime()).startsWith(asDate(expectedTuesday));
         assertThat(result.startDateTime()).endsWith("08:00:00");
         assertThat(result.endDateTime()).endsWith("10:00:00");
     }
@@ -472,14 +536,86 @@ class OrderUtilsTest {
     }
 
     @Test
-    void findOrdersForUser_shouldCallFindByEmployeeNameAndEndDateBetween() {
+    void findOrdersForUser_shouldCallFindByEmployeeIdAndEndDateBetween() {
         DateRange dateRange = new DateRange(new Date(1000), new Date(9000));
-        when(orderRepository.findByEmployeeNameAndEndDateBetween("Anna Nowak", dateRange.start(), dateRange.end()))
+        when(orderRepository.findByEmployeeIdAndEndDateBetween(1L, dateRange.start(), dateRange.end()))
                 .thenReturn(List.of(order));
 
-        List<Order> result = orderUtils.findOrdersForUser("Anna Nowak", dateRange);
+        List<Order> result = orderUtils.findOrdersForUser(1L, dateRange);
 
         assertThat(result).hasSize(1);
-        verify(orderRepository).findByEmployeeNameAndEndDateBetween("Anna Nowak", dateRange.start(), dateRange.end());
+        verify(orderRepository).findByEmployeeIdAndEndDateBetween(1L, dateRange.start(), dateRange.end());
     }
+
+    @Test
+    void findAvailableUsersWithEndDateTime_shouldRejectIdenticalOccupiedSlot() {
+        Date start = new Date(1000);
+        Date end = new Date(3000);
+        Order existing = new Order();
+        existing.setStartDate(start);
+        existing.setEndDate(end);
+
+        when(userRepository.findUsersByRole_NameIn(anyCollection())).thenReturn(List.of(employeeUser));
+        when(orderRepository.findBookedIntervalsForEmployees(
+                List.of(1L), start, end)).thenReturn(List.of(
+                new BookingInterval(1L, existing.getStartDate(), existing.getEndDate())));
+
+        assertThat(orderUtils.findAvailableUsersWithEndDateTime(start, end, 60)).isEmpty();
+    }
+
+    @Test
+    void findAvailableUsersWithEndDateTime_shouldAllowAdjacentSlots() {
+        Date start = new Date(3000);
+        Date end = new Date(5000);
+        Order adjacent = new Order();
+        adjacent.setStartDate(new Date(1000));
+        adjacent.setEndDate(start);
+        // Also verify interval logic directly, independently of repository filtering.
+        when(userRepository.findUsersByRole_NameIn(anyCollection())).thenReturn(List.of(employeeUser));
+        when(orderRepository.findBookedIntervalsForEmployees(
+                List.of(1L), start, end)).thenReturn(List.of(
+                new BookingInterval(1L, adjacent.getStartDate(), adjacent.getEndDate())));
+
+        assertThat(orderUtils.findAvailableUsersWithEndDateTime(start, end, 60))
+                .containsExactly(employeeUser);
+    }
+
+    @Test
+    void toOrderDTO_shouldUseIsoLocalDateTimeInWarsaw() {
+        order.setStartDate(java.util.Date.from(java.time.Instant.parse("2026-07-01T07:30:00Z")));
+        order.setEndDate(java.util.Date.from(java.time.Instant.parse("2026-07-01T09:00:00Z")));
+
+        OrderDTO result = orderUtils.toOrderDTO(order);
+
+        assertThat(result.startDate()).isEqualTo("2026-07-01T09:30:00");
+        assertThat(result.endDate()).isEqualTo("2026-07-01T11:00:00");
+    }
+
+    @Test
+    void prepareAvailabilityLookup_shouldReusePrefetchedBookingsAcrossCandidateSlots() {
+        Calendar monday = futureDayAt(Calendar.MONDAY, 8, 0);
+        Date start = monday.getTime();
+        Date busyEnd = new Date(start.getTime() + 60 * 60_000L);
+
+        when(userRepository.findUsersByRole_NameIn(anyCollection()))
+                .thenReturn(List.of(employeeUser));
+        when(orderRepository.findBookedIntervalsForEmployees(eq(List.of(1L)), eq(start), any(Date.class)))
+                .thenReturn(List.of(new BookingInterval(1L, start, busyEnd)));
+
+        var lookup = orderUtils.prepareAvailabilityLookup(start, null, null);
+        Calendar firstEnd = (Calendar) monday.clone();
+        firstEnd.add(Calendar.HOUR_OF_DAY, 1);
+        assertThat(lookup.apply(monday, firstEnd)).isEmpty();
+
+        Calendar nextStart = (Calendar) monday.clone();
+        nextStart.add(Calendar.HOUR_OF_DAY, 1);
+        Calendar nextEnd = (Calendar) nextStart.clone();
+        nextEnd.add(Calendar.HOUR_OF_DAY, 1);
+        assertThat(lookup.apply(nextStart, nextEnd)).containsExactly(employeeUser);
+
+        verify(userRepository, times(1)).findUsersByRole_NameIn(anyCollection());
+        verify(orderRepository, times(1)).findBookedIntervalsForEmployees(eq(List.of(1L)), eq(start), any(Date.class));
+        verifyNoMoreInteractions(orderRepository);
+    }
+
 }

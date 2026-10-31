@@ -109,7 +109,7 @@ public class ChatService {
                         conversation.getClient().getId().equals(user.getId());
 
         if (!isParticipant && !isClient) {
-            throw new AccessDeniedException("Access denied");
+            throw new AccessDeniedException(Messages.CONVERSATION_ACCESS_DENIED);
         }
 
         return toMessageDTOs(
