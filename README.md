@@ -2,9 +2,9 @@
 
 A REST API backend for managing orders, scheduling, and client/employee communication in a tailoring workshop.
 
-Originally built as an engineering thesis project — a full-stack Spring Boot application with a server-rendered frontend (Thymeleaf, Bootstrap, jQuery). This repository is a ground-up backend rewrite of that project: the same business domain and functionality, rebuilt as a clean, tested, API-only backend following current Spring Boot practices.
+Originally built as an engineering thesis project — a full-stack Spring Boot application with a server-rendered frontend (Thymeleaf, Bootstrap, jQuery). This repository is a backend rewrite of that project: the same business domain and functionality, rebuilt as a standalone, tested REST API with improved separation of concerns, security, and maintainability.
 
-> Thesis version (full-stack, original submission): [Praca-dyplomowa-SpringBoot-old](https://github.com/LBolechow/Praca-dyplomowa-SpringBoot-old)
+> Original thesis version (full-stack): [Praca-dyplomowa-SpringBoot-old](https://github.com/LBolechow/Praca-dyplomowa-SpringBoot-old)
 
 ---
 
@@ -29,6 +29,7 @@ Originally built as an engineering thesis project — a full-stack Spring Boot a
 
 **Public**
 - Registration and login (local account or Google OAuth2)
+- Password recovery using one-time reset tokens
 - Order status lookup by unique code
 - Price list
 
@@ -58,57 +59,65 @@ Originally built as an engineering thesis project — a full-stack Spring Boot a
 
 ## What Changed From the Original
 
-The original thesis project worked, but the codebase reflected the pace of a first full-stack build under a deadline. This version is a rewrite of the backend focused on production-oriented practices:
+The original thesis project combined backend logic with server-rendered views. This version separates the API from the presentation layer and reorganizes the codebase around maintainability, testing, and clearer responsibilities.
 
 **API design**
-- Replaced server-rendered views and raw `Map<String, Object>` payloads with a typed DTO layer built on Java records — explicit, self-documenting request/response contracts
-- Removed the Thymeleaf frontend entirely; the application is now a pure REST API
-- Endpoints handling user, order and conversation data return DTOs rather than entities, so password hashes and lazy relations can't leak into responses
-- Request validation via Bean Validation, with constraint violations mapped to structured `400` responses
+- Replaced server-rendered views and raw `Map<String, Object>` payloads with typed request and response DTOs, primarily using Java records
+- Removed the Thymeleaf frontend; the application now exposes a standalone REST API
+- Endpoints handling user, order, and conversation data return DTOs rather than JPA entities
+- Request validation using Bean Validation, with constraint violations mapped to structured `400 Bad Request` responses
 
 **Error handling**
 - Centralized exception handling with `@RestControllerAdvice`
-- Custom exception hierarchy (`ApplicationException`) mapped to consistent, structured JSON error responses with correct HTTP status codes
-- Services throw domain exceptions instead of returning `ResponseEntity` — the HTTP layer stays in the controllers
+- Custom exception hierarchy (`ApplicationException`) mapped to consistent JSON responses and appropriate HTTP status codes
+- Services throw domain exceptions rather than returning `ResponseEntity`
+- Internal exception details are logged server-side instead of being included in generic error responses
+- Dedicated handling for malformed request bodies and invalid input formats
 
 **Security**
-- JWT-based stateless authentication with token invalidation on logout, backed by a blacklist and a scheduled cleanup of expired entries
-- Rebuilt OAuth2 (Google) integration with externalized configuration — no hardcoded redirect URLs or credentials
-- Reworked Spring Security route configuration around explicit per-role access rules
-- Roles defined in a single `UserRole` enum, which also encodes the distinction between the Spring Security role name (`ADMIN`) and the stored authority (`ROLE_ADMIN`)
+- JWT-based stateless authentication, with token invalidation on logout using a blacklist and scheduled cleanup of expired entries
+- Google OAuth2 integration with externalized configuration and a short-lived, single-use code exchange mechanism
+- Role-based endpoint authorization configured through Spring Security
+- Object-level authorization checks for conversation access, verifying that the authenticated user belongs to the requested conversation
+- Password recovery using cryptographically secure reset tokens instead of sending replacement passwords by email
+- Reset tokens generated using `SecureRandom`, stored as SHA-256 hashes, and subject to expiration and single-use restrictions
+- Centralized security path configuration and explicit access rules for clients, employees, and administrators
+- Roles defined in a single `UserRole` enum, distinguishing role names from Spring Security authorities
 
 **Code structure**
-- Constructor injection (`@RequiredArgsConstructor`) throughout — no field injection
-- Thin controllers: `@RestController`, no business logic, pure delegation to services
-- Business logic extracted into dedicated utility classes (`OrderUtils`, `UserUtils`) to keep services focused and testable
-- User-facing and diagnostic messages centralized in a single `Messages` class rather than scattered string literals
-- Structured logging with SLF4J on authentication events, data-modifying operations and unhandled exceptions
+- Constructor injection (`@RequiredArgsConstructor`) throughout
+- Thin REST controllers delegating business operations to services
+- Shared functionality extracted into utility classes (`OrderUtils`, `UserUtils`)
+- Domain-specific exceptions and centralized HTTP error handling
+- User-facing and diagnostic messages organized through the `Messages` class
+- Structured logging with SLF4J for authentication events, data modifications, and unexpected exceptions
 
 **Testing**
-- Unit tests covering the services and the scheduling and JWT utilities (JUnit 5 + Mockito + AssertJ)
-- Integration tests for the persistence layer on H2 (`@DataJpaTest`), which catch derived-query and `@EntityGraph` errors that mocked tests cannot
-- Context test (`@SpringBootTest`) guarding against bean conflicts, circular dependencies and invalid configuration
-- Business-critical logic — the availability-scheduling algorithm — covered with dedicated edge-case tests: weekend skipping, workday boundaries, overlapping orders, past-date handling
+- Unit tests covering services, scheduling logic, JWT utilities, and password recovery
+- Security-focused regression tests for resource authorization, token validation, and OAuth2 code reuse
+- Integration tests for persistence using H2 (`@DataJpaTest`), covering repository queries and JPA mappings
+- Application context testing (`@SpringBootTest`) to detect configuration and dependency injection issues
+- Dedicated scheduling tests covering weekend skipping, working-hour boundaries, overlapping orders, and invalid dates
 
 ---
 
 ## Project Structure
 
-```
+```text
 src/main/java/pl/lukbol/dyplom/
 ├── classes/           # JPA entities
 ├── common/            # Shared constants (Messages, SecurityPaths, UserRole)
-├── configs/           # Security config, JWT filter, OAuth2 handler, scheduled tasks
+├── configs/           # Security, JWT, OAuth2, WebSocket, scheduled tasks
 ├── controllers/       # REST controllers
 ├── DTOs/              # Request/response records
-├── exceptions/        # Custom exceptions + GlobalExceptionHandler
+├── exceptions/        # Custom exceptions and GlobalExceptionHandler
 ├── repositories/      # Spring Data JPA repositories
 ├── services/          # Business logic
 └── utilities/         # OrderUtils, UserUtils, JwtUtil, DateUtils, ...
 
 src/test/java/pl/lukbol/dyplom/
 ├── unitTests/         # Service and utility unit tests
-└── integrationTests/  # Repository tests on H2
+└── integrationTests/  # Repository integration tests
 ```
 
 ---
@@ -116,6 +125,7 @@ src/test/java/pl/lukbol/dyplom/
 ## Getting Started
 
 ### Prerequisites
+
 - Java 17+
 - Maven
 - PostgreSQL (optional — H2 file-based database is configured by default)
@@ -128,15 +138,24 @@ Copy the example configuration and fill in your own values:
 cp src/main/resources/application.properties.example src/main/resources/application.properties
 ```
 
-Three values must be set before the first run:
+The following properties require configuration:
 
 | Property | Notes |
 |---|---|
-| `jwt.secret` | Base64 string, at least 256 bits — e.g. `openssl rand -base64 32` |
-| `spring.security.oauth2.client.registration.google.client-id` | From Google Cloud Console → Credentials |
-| `spring.security.oauth2.client.registration.google.client-secret` | As above |
+| `jwt.secret` | Base64-encoded key containing at least 256 bits of random data |
+| `spring.security.oauth2.client.registration.google.client-id` | Google Cloud Console → Credentials |
+| `spring.security.oauth2.client.registration.google.client-secret` | Google OAuth2 client secret |
+| `app.admin.*` | Initial administrator account configuration |
 
-The database section contains two blocks — H2 (default) and PostgreSQL. Uncomment whichever you need and comment out the other. An administrator account is created automatically on first startup using the `app.admin.*` properties.
+Generate a JWT signing key locally:
+
+```bash
+openssl rand -base64 32
+```
+
+The database configuration contains separate blocks for H2 and PostgreSQL. Enable the desired configuration and disable the other.
+
+An administrator account is created automatically on first startup using the `app.admin.*` properties.
 
 ### Run
 
@@ -148,13 +167,23 @@ mvn spring-boot:run
 
 ### API Documentation
 
-With the application running, the interactive OpenAPI documentation is available at:
+With the application running, Swagger UI is available at:
 
-```
+```text
 http://localhost:8080/swagger-ui/index.html
 ```
 
-The H2 console (when H2 is enabled) is at `http://localhost:8080/h2-console`.
+The OpenAPI specification is exposed at:
+
+```text
+http://localhost:8080/v3/api-docs
+```
+
+The H2 console, when enabled, is available at:
+
+```text
+http://localhost:8080/h2-console
+```
 
 ### Test
 
@@ -167,8 +196,13 @@ mvn test
 ## Roadmap
 
 - [ ] Refresh token support
-- [ ] Validation coverage extended to the remaining request DTOs
-- [ ] Date fields typed as `LocalDate` instead of `String` in order DTOs
+- [ ] Extend validation coverage to remaining request DTOs
+- [ ] Replace string-based date fields with `LocalDate` where appropriate
+- [ ] Extend object-level authorization checks across conversation operations
+- [ ] Add rate limiting to authentication and password recovery endpoints
+- [ ] Complete OAuth2 code exchange hardening
+- [ ] Review and refine HTTP security headers and CORS configuration
+- [ ] Extend security integration tests
 
 ---
 
