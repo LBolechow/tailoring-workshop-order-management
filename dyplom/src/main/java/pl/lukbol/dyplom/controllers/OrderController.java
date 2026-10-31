@@ -19,7 +19,6 @@ import pl.lukbol.dyplom.utilities.OrderUtils;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -130,10 +129,10 @@ public class OrderController {
     @PatchMapping("/material/{materialId}")
     public ResponseEntity<ApiResponseDTO> updateMaterialCheckedState(
             @PathVariable Long materialId,
-            @RequestBody Map<String, Boolean> requestBody,
+            @Valid @RequestBody UpdateMaterialCheckedDTO requestBody,
             Authentication authentication) {
         orderAccessService.assertCanAccessMaterial(materialId, authentication);
-        boolean checked = requestBody.getOrDefault("checked", false);
+        boolean checked = requestBody.checked();
 
         ApiResponseDTO response = orderService.updateMaterialCheckedState(materialId, checked);
 

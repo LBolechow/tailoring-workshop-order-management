@@ -5,6 +5,43 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public final class Messages {
 
+    // Validation messages for inbound DTOs (annotation constants)
+    public static final String VALIDATION_EMAIL_REQUIRED = "Adres email jest wymagany.";
+    public static final String VALIDATION_EMAIL_INVALID = "Nieprawidłowy format adresu email.";
+    public static final String VALIDATION_EMAIL_TOO_LONG = "Adres email nie może przekraczać 254 znaków.";
+    public static final String VALIDATION_NAME_REQUIRED = "Imię i nazwisko jest wymagane.";
+    public static final String VALIDATION_NAME_TOO_LONG = "Imię i nazwisko nie może przekraczać 255 znaków.";
+    public static final String VALIDATION_PASSWORD_REQUIRED = "Hasło jest wymagane.";
+    public static final String VALIDATION_PASSWORD_MIN_8 = "Hasło musi mieć co najmniej 8 znaków.";
+    public static final String VALIDATION_PASSWORD_MIN_12 = "Nowe hasło musi mieć co najmniej 12 znaków.";
+    public static final String VALIDATION_PASSWORD_TOO_LONG = "Hasło nie może przekraczać 128 znaków.";
+    public static final String VALIDATION_REPEAT_PASSWORD_REQUIRED = "Powtórzenie hasła jest wymagane.";
+    public static final String VALIDATION_ROLE_REQUIRED = "Rola jest wymagana.";
+    public static final String VALIDATION_ROLE_INVALID = "Nieprawidłowa rola użytkownika.";
+    public static final String VALIDATION_ORDER_DESCRIPTION_TOO_LONG = "Opis zamówienia nie może przekraczać 255 znaków.";
+    public static final String VALIDATION_ORDER_CLIENT_TOO_LONG = "Nazwa klienta nie może przekraczać 255 znaków.";
+    public static final String VALIDATION_ORDER_PHONE_TOO_LONG = "Numer telefonu nie może przekraczać 32 znaków.";
+    public static final String VALIDATION_ORDER_EMPLOYEE_TOO_LONG = "Nazwa pracownika nie może przekraczać 255 znaków.";
+    public static final String VALIDATION_ORDER_DATE_TOO_LONG = "Wartość daty jest zbyt długa.";
+    public static final String VALIDATION_ORDER_STATUS_INVALID = "Dozwolone statusy: W trakcie, Zakończone, Anulowane.";
+    public static final String VALIDATION_ORDER_ITEMS_TOO_MANY = "Jedno zlecenie może zawierać maksymalnie 100 materiałów.";
+    public static final String VALIDATION_ORDER_ITEM_REQUIRED = "Nazwa materiału nie może być pusta.";
+    public static final String VALIDATION_ORDER_ITEM_TOO_LONG = "Nazwa materiału nie może przekraczać 255 znaków.";
+    public static final String VALIDATION_PRICE_ITEM_REQUIRED = "Nazwa pozycji cennika jest wymagana.";
+    public static final String VALIDATION_PRICE_ITEM_TOO_LONG = "Nazwa pozycji cennika nie może przekraczać 255 znaków.";
+    public static final String VALIDATION_PRICE_VALUE_REQUIRED = "Cena jest wymagana.";
+    public static final String VALIDATION_PRICE_VALUE_TOO_LONG = "Wartość ceny nie może przekraczać 255 znaków.";
+    public static final String VALIDATION_NOTIFICATION_MESSAGE_REQUIRED = "Treść powiadomienia jest wymagana.";
+    public static final String VALIDATION_NOTIFICATION_MESSAGE_TOO_LONG = "Treść powiadomienia nie może przekraczać 255 znaków.";
+    public static final String VALIDATION_NOTIFICATION_RECIPIENTS_REQUIRED = "Wskaż co najmniej jednego odbiorcę powiadomienia.";
+    public static final String VALIDATION_NOTIFICATION_RECIPIENT_INVALID = "Identyfikator odbiorcy musi być dodatni.";
+    public static final String VALIDATION_NOTIFICATION_RECIPIENTS_TOO_MANY = "Można wskazać maksymalnie 100 odbiorców.";
+    public static final String VALIDATION_OAUTH_CODE_REQUIRED = "Kod autoryzacyjny jest wymagany.";
+    public static final String VALIDATION_OAUTH_CODE_TOO_LONG = "Kod autoryzacyjny jest zbyt długi.";
+    public static final String VALIDATION_RESET_TOKEN_REQUIRED = "Token resetowania hasła jest wymagany.";
+    public static final String VALIDATION_RESET_TOKEN_TOO_LONG = "Token resetowania hasła jest zbyt długi.";
+    public static final String VALIDATION_MATERIAL_CHECKED_REQUIRED = "Pole checked jest wymagane.";
+
     // User-related messages
     public static final String ACCOUNT_CREATED = "Konto zostało utworzone pomyślnie.";
     public static final String PASSWORDS_DO_NOT_MATCH = "Hasła nie są zgodne.";

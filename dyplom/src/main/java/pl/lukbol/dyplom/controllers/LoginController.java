@@ -2,6 +2,8 @@ package pl.lukbol.dyplom.controllers;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -33,7 +35,11 @@ public class LoginController {
 
     private final OAuth2CodeService codeService;
 
-    public record OAuth2ExchangeRequest(String code) {}
+    public record OAuth2ExchangeRequest(
+            @NotBlank(message = Messages.VALIDATION_OAUTH_CODE_REQUIRED)
+            @Size(max = 256, message = Messages.VALIDATION_OAUTH_CODE_TOO_LONG)
+            String code
+    ) {}
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody LoginRequestDTO loginRequest) {

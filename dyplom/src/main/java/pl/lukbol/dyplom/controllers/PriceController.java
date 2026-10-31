@@ -1,5 +1,6 @@
 package pl.lukbol.dyplom.controllers;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +23,7 @@ public class PriceController {
     }
 
     @PostMapping("/add-price")
-    public ResponseEntity<ApiResponseDTO> addPrice(@RequestBody PriceRequestDTO priceRequestDTO) {
+    public ResponseEntity<ApiResponseDTO> addPrice(@Valid @RequestBody PriceRequestDTO priceRequestDTO) {
         return ResponseEntity.ok(priceService.addPrice(priceRequestDTO));
     }
 
@@ -33,7 +34,7 @@ public class PriceController {
 
     @PutMapping("/update-price/{id}")
     public ResponseEntity<ApiResponseDTO> updatePrice(@PathVariable Long id,
-                                                      @RequestBody PriceRequestDTO priceRequestDTO) {
+                                                      @Valid @RequestBody PriceRequestDTO priceRequestDTO) {
         return ResponseEntity.ok(priceService.updatePrice(id, priceRequestDTO));
     }
 }

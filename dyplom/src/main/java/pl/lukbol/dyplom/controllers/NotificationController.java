@@ -1,5 +1,6 @@
 package pl.lukbol.dyplom.controllers;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -30,7 +31,7 @@ public class NotificationController {
     @PostMapping("/create-notification")
     public ResponseEntity<ApiResponseDTO> createNotification(
             Authentication authentication,
-            @RequestBody NotificationRequestDTO notificationRequestDTO) {
+            @Valid @RequestBody NotificationRequestDTO notificationRequestDTO) {
 
         String userEmail = checkmail(authentication.getPrincipal());
         ApiResponseDTO response = notificationService.createNotification(userEmail, notificationRequestDTO);

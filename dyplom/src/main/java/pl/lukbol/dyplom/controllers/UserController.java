@@ -47,7 +47,7 @@ public class UserController {
     @PostMapping("/profile/apply")
     public ResponseEntity<ApiResponseDTO> changeProfile(
             Authentication authentication,
-            @RequestBody UpdateProfileRequestDTO updateProfileRequestDTO
+            @Valid @RequestBody UpdateProfileRequestDTO updateProfileRequestDTO
     ) {
         ApiResponseDTO response = userService.changeProfile(authentication, updateProfileRequestDTO);
         return ResponseEntity.ok(response);
@@ -66,7 +66,7 @@ public class UserController {
     }
 
     @PutMapping("/users/update/{id}")
-    public ResponseEntity<ApiResponseDTO> updateUser(@PathVariable Long id, @RequestBody UpdateUserRequest updateUserRequest) {
+    public ResponseEntity<ApiResponseDTO> updateUser(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest updateUserRequest) {
 
         ApiResponseDTO response= userService.updateUser(id, updateUserRequest);
         return ResponseEntity.ok(response);
